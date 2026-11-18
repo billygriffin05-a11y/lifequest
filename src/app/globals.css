@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/*
+ * LIFEQUEST design tokens — dark fantasy: obsidian backgrounds with emerald,
+ * gold and silver accents. Use these tokens (e.g. bg-obsidian-900,
+ * text-gold-400, border-emerald-500/40) instead of raw hex values.
+ * Contrast: body text on obsidian must stay >= 4.5:1 (WCAG AA).
+ */
+@theme {
+  --color-obsidian-950: #07080a;
+  --color-obsidian-900: #0d0f12;
+  --color-obsidian-800: #151920;
+  --color-obsidian-700: #1f2530;
+  --color-obsidian-600: #2b3341;
+
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-700: #047857;
+
+  --color-gold-300: #f3d98b;
+  --color-gold-400: #e6c15a;
+  --color-gold-500: #c9a227;
+  --color-gold-700: #8a6d12;
+
+  --color-silver-100: #eef1f5;
+  --color-silver-300: #c8ced8;
+  --color-silver-500: #8b93a1;
+
+  --font-display: var(--font-cinzel), "Times New Roman", serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-obsidian-950);
+  color: var(--color-silver-100);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

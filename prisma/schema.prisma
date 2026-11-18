@@ -1,0 +1,48 @@
+// LIFEQUEST local database schema (SQLite, owned by the user's PC).
+//
+// Environment-setup phase: only infrastructure tables live here. Feature
+// tables (quests, finance, fitness, ...) are added in later phases, each via
+// its own migration. See ARCHITECTURE.md and .claude/skills/local-database.
+//
+// Conventions:
+//  - Every syncable table gets: id (cuid), createdAt, updatedAt, deletedAt
+//    (soft delete), version (Int, optimistic concurrency) and updatedByDevice.
+//  - Money is stored as integer minor units (pence) — never Float.
+//  - Never store bank passwords. OAuth tokens are stored encrypted (see SECURITY.md).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// Key/value application settings. `value` is a JSON string.
+model AppSetting {
+  key             String   @id
+  value           String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  version         Int      @default(1)
+  updatedByDevice String   @default("pc")
+}
+
+/// Append-only audit trail for important actions (financial, rewards,
+/// backups, restores, sync). Never store secrets or raw personal data in
+/// `details` — store identifiers and summaries only.
+model AuditEvent {
+  id         String   @id @default(cuid())
+  occurredAt DateTime @default(now())
+  actor      String
+  action     String
+  entityType String?
+  entityId   String?
+  /// Idempotency key: a repeated operation with the same key is rejected.
+  idempotencyKey String? @unique
+  details    String?
+
+  @@index([entityType, entityId])
+  @@index([occurredAt])
+}
