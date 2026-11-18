@@ -21,7 +21,7 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import type { DataPaths } from "../config/paths";
 
-export type BackupReason = "auto" | "manual" | "pre-migrate" | "pre-restore";
+export type BackupReason = "auto" | "manual" | "pre-migrate" | "pre-restore" | "pre-reset";
 const PRUNABLE: ReadonlySet<BackupReason> = new Set(["auto"]);
 
 export interface BackupManifest {

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 /**
  * Environment-setup placeholder. Replaced by the real home screen in the
  * first application development phase.
@@ -10,6 +12,23 @@ export default function Home() {
         <h1 className="mt-4 font-display text-4xl font-bold tracking-wide text-gold-300 sm:text-5xl">LIFEQUEST</h1>
         <p className="mt-4 text-silver-300">
           The forge is ready. Your data stays on your own PC.
+        </p>
+        <Link
+          href="/honour"
+          className="mt-8 inline-flex min-h-11 items-center rounded-lg bg-gold-500 px-6 font-semibold text-obsidian-950 hover:bg-gold-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-300"
+        >
+          Open your Honour ledger
+        </Link>
+        <Link
+          href="/dragons"
+          className="mt-3 ml-3 inline-flex min-h-11 items-center rounded-lg border border-emerald-500/50 px-6 font-semibold text-emerald-300 hover:bg-emerald-700/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+        >
+          Visit the Dragon Lair
+        </Link>
+        <p className="mt-4">
+          <Link href="/settings" className="inline-flex min-h-11 items-center text-sm text-silver-300 underline underline-offset-4 hover:text-gold-300">
+            Settings &amp; Google Calendar
+          </Link>
         </p>
         <p className="mt-8 text-sm text-silver-500">
           Server status: <a className="text-emerald-300 underline underline-offset-4 hover:text-emerald-400" href="/api/health">/api/health</a>

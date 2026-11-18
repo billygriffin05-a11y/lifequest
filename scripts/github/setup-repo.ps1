@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 gh auth status | Out-Null
 $Owner = gh api user --jq .login
 
-if (-not (git remote get-url origin 2>$null)) {
+if (-not ((git remote) -contains "origin")) {
   gh repo create "$Owner/$Name" --private --source . --remote origin --description "LIFEQUEST - local-first life RPG"
 }
 git push -u origin main
@@ -29,6 +29,7 @@ $protection = @{
   required_linear_history = $true
 } | ConvertTo-Json -Depth 5
 $protection | gh api -X PUT "repos/$Owner/$Name/branches/main/protection" --input - | Out-Null
+$mainProtected = ($LASTEXITCODE -eq 0)
 
 # Lighter protection for dev: CI must pass, no force pushes.
 $devProtection = @{
@@ -43,4 +44,9 @@ $devProtection | gh api -X PUT "repos/$Owner/$Name/branches/dev/protection" --in
 
 # Dependabot vulnerability alerts (secret scanning runs in CI via gitleaks).
 gh api -X PUT "repos/$Owner/$Name/vulnerability-alerts" | Out-Null
-Write-Host "Done: https://github.com/$Owner/$Name (main protected, dev default)."
+if ($mainProtected) {
+  Write-Host "Done: https://github.com/$Owner/$Name (main protected, dev default)."
+} else {
+  Write-Warning "Repo pushed, but branch protection was NOT applied. Private repos need GitHub Pro (or a public repo) for protected branches."
+  Write-Host "Repo: https://github.com/$Owner/$Name (dev default)."
+}

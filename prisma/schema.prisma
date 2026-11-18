@@ -46,3 +46,93 @@ model AuditEvent {
   @@index([entityType, entityId])
   @@index([occurredAt])
 }
+
+// ── Google Calendar integration ──────────────────────────────────────────────
+
+/// The single linked Google account. Tokens are AES-256-GCM encrypted with a
+/// key stored OUTSIDE the database (data dir /secrets). Never log them.
+model GoogleConnection {
+  id                    String   @id @default("google")
+  refreshTokenEncrypted String
+  accessTokenEncrypted  String?
+  accessTokenExpiresAt  DateTime?
+  /// The dedicated "LIFEQUEST" calendar this app created (app-created scope).
+  calendarId            String?
+  connectedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+/// Pending calendar writes. Logged deeds are queued here and pushed to Google
+/// in the background, so logging never waits on (or fails because of) Google.
+model CalendarOutbox {
+  id          String    @id @default(cuid())
+  /// "create" | "delete"
+  op          String
+  /// Deterministic Google event id (idempotent create/delete).
+  eventId     String
+  /// JSON event body for creates (summary, start, end, …).
+  payload     String?
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  doneAt      DateTime?
+
+  @@index([doneAt])
+}
+
+// ── Honour: customisable good / bad actions ─────────────────────────────────
+
+/// A user-defined good or bad action, e.g. "Gym session" (+20, good) or
+/// "Takeaway" (15, bad). Definitions persist day to day; archiving hides an
+/// action from logging without losing its history.
+model PointAction {
+  id              String       @id @default(cuid())
+  name            String
+  /// "good" | "bad" (validated in src/features/honour/schemas.ts)
+  kind            String
+  /// Positive magnitude. Good adds Honour (and XP); bad subtracts Honour.
+  points          Int
+  icon            String
+  category        String
+  sortOrder       Int          @default(0)
+  archivedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+  version         Int          @default(1)
+  updatedByDevice String       @default("pc")
+  entries         PointEntry[]
+
+  @@index([kind, archivedAt])
+}
+
+/// Append-only Honour/XP ledger. Never updated or deleted: an undo is a new
+/// entry that reverses the original (`reversesEntryId`). Totals are derived.
+model PointEntry {
+  id              String      @id @default(cuid())
+  actionId        String
+  action          PointAction @relation(fields: [actionId], references: [id], onDelete: Restrict)
+  /// Snapshots so history stays correct if the action is later edited.
+  kind            String
+  actionName      String
+  actionIcon      String
+  /// Category at the time of logging — decides which area dragon gets the XP.
+  actionCategory  String      @default("Other")
+  /// Signed change to the Honour score.
+  honourDelta     Int
+  /// Change to XP (good actions only; negative only when reversing a good entry).
+  xpDelta         Int
+  /// Local calendar day (Europe/London), YYYY-MM-DD.
+  occurredOn      String
+  occurredAt      DateTime    @default(now())
+  /// Client-generated key: a retried request never creates a second entry.
+  idempotencyKey  String      @unique
+  /// Set on reversal entries; unique so an entry can only be undone once.
+  reversesEntryId String?     @unique
+  createdAt       DateTime    @default(now())
+  updatedByDevice String      @default("pc")
+
+  @@index([occurredOn])
+  @@index([actionId])
+  @@index([actionCategory])
+}

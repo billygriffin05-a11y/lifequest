@@ -25,6 +25,7 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}/api/health`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
-    env: { LIFEQUEST_DATA_DIR: E2E_DATA_DIR, LIFEQUEST_ENV: "test" },
+    // Blank Google credentials so e2e never talks to Google, even if .env.local has real ones.
+    env: { LIFEQUEST_DATA_DIR: E2E_DATA_DIR, LIFEQUEST_ENV: "test", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" },
   },
 });

@@ -15,12 +15,32 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
       contents: read
+      actions: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
           queries: security-extended
+      # Upload to GitHub code scanning (Security tab) and also fail this
+      # check on any finding, so a PR can't merge with open CodeQL issues.
       - uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif-results
+      - name: Fail on CodeQL findings
+        run: |
+          count=$(jq '[.runs[].results[]] | length' sarif-results/*.sarif)
+          echo "CodeQL findings: $count"
+          if [ "$count" -gt 0 ]; then
+            jq -r '.runs[].results[] | "::error file=\(.locations[0].physicalLocation.artifactLocation.uri),line=\(.locations[0].physicalLocation.region.startLine)::\(.ruleId): \(.message.text)"' sarif-results/*.sarif
+            exit 1
+          fi
+      - name: Keep SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif
+          path: sarif-results/
+          retention-days: 14
