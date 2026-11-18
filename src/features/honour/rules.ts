@@ -33,6 +33,37 @@ export function londonDateKey(date: Date): string {
   }).format(date);
 }
 
+/** The `n` calendar-day keys ending at `todayKey` (oldest first). Pure calendar maths, DST-safe. */
+export function lastNDateKeys(todayKey: string, n: number): string[] {
+  const [y, m, d] = todayKey.split("-").map(Number);
+  return Array.from({ length: n }, (_, i) =>
+    new Date(Date.UTC(y, m - 1, d - (n - 1 - i), 12)).toISOString().slice(0, 10),
+  );
+}
+
+export interface DailyPoint {
+  date: string;
+  /** Good points earned that day (net of undos). */
+  good: number;
+  /** Bad points lost that day, as a positive number (net of undos). */
+  bad: number;
+}
+
+/** One point per day for the given keys; days with nothing logged are 0. */
+export function buildDailySeries(
+  rows: readonly { occurredOn: string; kind: string; honourDelta: number }[],
+  keys: readonly string[],
+): DailyPoint[] {
+  const byDay = new Map(keys.map((k) => [k, { date: k, good: 0, bad: 0 }]));
+  for (const r of rows) {
+    const p = byDay.get(r.occurredOn);
+    if (!p) continue;
+    if (r.kind === "good") p.good += r.honourDelta;
+    else p.bad -= r.honourDelta;
+  }
+  return keys.map((k) => byDay.get(k)!);
+}
+
 export interface LedgerRow extends Deltas {
   kind: string;
   occurredOn: string;

@@ -1,11 +1,18 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { prisma } from "@/server/db/client";
 import { LIFEQUEST_TIME_ZONE } from "../rules";
 import { addStarterActionsAction, setArchivedAction } from "../server/actions";
-import { getSummary, getTodayEntries, listActions } from "../server/service";
+import { getDailyTrend, getSummary, getTodayEntries, listActions, TREND_RANGES, type TrendRange } from "../server/service";
 import { ActionForm } from "./action-form";
 import { LogButton } from "./log-button";
+import { TrendChart } from "./trend-chart";
 import { UndoButton } from "./undo-button";
+
+function parseRange(raw: string | string[] | undefined): TrendRange {
+  const n = Number(Array.isArray(raw) ? raw[0] : raw);
+  return (TREND_RANGES as readonly number[]).includes(n) ? (n as TrendRange) : 30;
+}
 
 const timeFmt = new Intl.DateTimeFormat("en-GB", { timeZone: LIFEQUEST_TIME_ZONE, hour: "2-digit", minute: "2-digit" });
 const num = new Intl.NumberFormat("en-GB");
@@ -13,13 +20,19 @@ const signed = (n: number) => (n > 0 ? `+${num.format(n)}` : n < 0 ? `−${num.f
 
 const card = "rounded-2xl border border-obsidian-600 bg-obsidian-900/80 p-5";
 
-export async function HonourBoard() {
+export async function HonourBoard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await connection(); // personal data: always read at request time, never prerendered
-  const [summary, active, all, today] = await Promise.all([
+  const range = parseRange((await searchParams).range);
+  const [summary, active, all, today, trend] = await Promise.all([
     getSummary(prisma),
     listActions(prisma),
     listActions(prisma, { includeArchived: true }),
     getTodayEntries(prisma),
+    getDailyTrend(prisma, range),
   ]);
   const good = active.filter((a) => a.kind === "good");
   const bad = active.filter((a) => a.kind === "bad");
@@ -52,6 +65,38 @@ export async function HonourBoard() {
             <span className="text-emerald-300">+{num.format(summary.today.good)} good</span> ·{" "}
             <span className="text-ember-300">−{num.format(summary.today.bad)} bad</span>
           </p>
+        </div>
+      </section>
+
+      {/* Trend */}
+      <section aria-labelledby="trend-heading" className={`${card} min-w-0`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="trend-heading" className="font-display text-xl text-gold-300">
+            Good vs bad
+          </h2>
+          <nav aria-label="Chart range" className="flex flex-wrap gap-1">
+            {TREND_RANGES.map((r) => (
+              <Link
+                key={r}
+                href={`/honour?range=${r}`}
+                scroll={false}
+                aria-current={r === range ? "page" : undefined}
+                className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
+                  r === range
+                    ? "border-gold-500/60 bg-gold-500/10 font-semibold text-gold-300"
+                    : "border-obsidian-600 text-silver-300 hover:text-silver-100"
+                }`}
+              >
+                {r} days
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <p className="mt-1 text-sm text-silver-300">
+          Points from good deeds and bad habits each day — last {range} days.
+        </p>
+        <div className="mt-4">
+          <TrendChart data={trend} />
         </div>
       </section>
 

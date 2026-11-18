@@ -5,7 +5,7 @@ import { HonourBoard } from "@/features/honour/components/honour-board";
 
 export const metadata: Metadata = { title: "Honour · LIFEQUEST" };
 
-export default function HonourPage() {
+export default function HonourPage({ searchParams }: PageProps<"/honour">) {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
       <nav aria-label="Breadcrumb" className="flex flex-wrap gap-x-6 text-sm">
@@ -23,7 +23,7 @@ export default function HonourPage() {
         </p>
       </header>
       <Suspense fallback={<p className="text-silver-300">Opening your ledger…</p>}>
-        <HonourBoard />
+        <HonourBoard searchParams={searchParams} />
       </Suspense>
     </main>
   );

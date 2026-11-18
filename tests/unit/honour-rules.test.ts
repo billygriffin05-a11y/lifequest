@@ -1,5 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { deltasFor, londonDateKey, reversalOf, summarise } from "@/features/honour/rules";
+import {
+  buildDailySeries,
+  deltasFor,
+  lastNDateKeys,
+  londonDateKey,
+  reversalOf,
+  summarise,
+} from "@/features/honour/rules";
+
+describe("daily good/bad series", () => {
+  it("lists the last N calendar days, oldest first, across month ends and DST", () => {
+    expect(lastNDateKeys("2026-03-02", 4)).toEqual(["2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02"]);
+    // UK clocks go forward on 29 Mar 2026: no day skipped or repeated
+    expect(lastNDateKeys("2026-03-30", 3)).toEqual(["2026-03-28", "2026-03-29", "2026-03-30"]);
+    expect(lastNDateKeys("2026-11-18", 30)).toHaveLength(30);
+  });
+
+  it("splits good and bad, nets undos, fills empty days with 0, ignores out-of-range rows", () => {
+    const keys = ["2026-11-16", "2026-11-17", "2026-11-18"];
+    const series = buildDailySeries(
+      [
+        { occurredOn: "2026-11-16", kind: "good", honourDelta: 20 },
+        { occurredOn: "2026-11-16", kind: "bad", honourDelta: -15 },
+        { occurredOn: "2026-11-18", kind: "good", honourDelta: 10 },
+        { occurredOn: "2026-11-18", kind: "good", honourDelta: -10 }, // undo
+        { occurredOn: "2026-11-18", kind: "bad", honourDelta: -5 },
+        { occurredOn: "2026-10-01", kind: "good", honourDelta: 999 },
+      ],
+      keys,
+    );
+    expect(series).toEqual([
+      { date: "2026-11-16", good: 20, bad: 15 },
+      { date: "2026-11-17", good: 0, bad: 0 },
+      { date: "2026-11-18", good: 0, bad: 5 },
+    ]);
+  });
+});
 import { actionInputSchema, logInputSchema } from "@/features/honour/schemas";
 
 describe("honour rules", () => {
