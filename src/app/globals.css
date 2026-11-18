@@ -23,6 +23,12 @@
   --color-gold-500: #c9a227;
   --color-gold-700: #8a6d12;
 
+  /* Ember: bad habits / penalties. */
+  --color-ember-300: #f6a7a0;
+  --color-ember-400: #ee7d72;
+  --color-ember-500: #d9534a;
+  --color-ember-700: #8e2a23;
+
   --color-silver-100: #eef1f5;
   --color-silver-300: #c8ced8;
   --color-silver-500: #8b93a1;
