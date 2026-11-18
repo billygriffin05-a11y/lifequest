@@ -10,9 +10,11 @@ interface Props {
   points: number;
   kind: "good" | "bad";
   category: string;
+  /** Already logged today (one per day). */
+  doneToday?: boolean;
 }
 
-export function LogButton({ actionId, name, icon, points, kind, category }: Props) {
+export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const good = kind === "good";
@@ -22,8 +24,10 @@ export function LogButton({ actionId, name, icon, points, kind, category }: Prop
     <div>
       <button
         type="button"
-        disabled={pending}
-        aria-label={`Log ${name}: ${good ? "plus" : "minus"} ${points} Honour`}
+        disabled={pending || doneToday}
+        aria-label={
+          doneToday ? `${name}: done today` : `Log ${name}: ${good ? "plus" : "minus"} ${points} Honour`
+        }
         onClick={() =>
           startTransition(async () => {
             setError(null);
@@ -45,7 +49,11 @@ export function LogButton({ actionId, name, icon, points, kind, category }: Prop
           <span className="block font-medium text-silver-100">{name}</span>
           <span className="block text-xs text-silver-300">{category}</span>
         </span>
-        <span className={`font-display text-lg font-bold ${good ? "text-emerald-300" : "text-ember-300"}`}>{signed}</span>
+        {doneToday ? (
+          <span className="text-sm font-semibold text-silver-300">✓ Done today</span>
+        ) : (
+          <span className={`font-display text-lg font-bold ${good ? "text-emerald-300" : "text-ember-300"}`}>{signed}</span>
+        )}
       </button>
       {error && (
         <p role="alert" className="mt-1 text-sm text-ember-300">

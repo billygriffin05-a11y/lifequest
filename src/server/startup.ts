@@ -38,3 +38,27 @@ async function runAutoBackup() {
 
 void runAutoBackup();
 setInterval(runAutoBackup, 60 * 60 * 1000).unref();
+
+// Google Calendar outbox retry (deeds logged while offline get pushed later).
+// Lazy imports: only touches Prisma/Google when the owner has set it up.
+async function runCalendarSync() {
+  try {
+    const [{ googleConfig }, { processOutbox }, { createPrismaClient }] = await Promise.all([
+      import("@/features/calendar/google/config"),
+      import("@/features/calendar/server/service"),
+      import("./db/factory"),
+    ]);
+    const cfg = googleConfig();
+    if (!cfg) return;
+    const db = createPrismaClient(paths.dbFile);
+    try {
+      const r = await processOutbox({ db, paths, cfg, fetchImpl: fetch });
+      if (r.sent || r.failed) console.info(`[lifequest] calendar sync: ${r.sent} sent, ${r.failed} failed`);
+    } finally {
+      await db.$disconnect();
+    }
+  } catch {
+    console.error("[lifequest] calendar sync failed");
+  }
+}
+setInterval(runCalendarSync, 5 * 60 * 1000).unref();

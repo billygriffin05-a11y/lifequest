@@ -108,12 +108,25 @@ async function main() {
       out(`restored ${r.restored}; previous database saved as ${r.safetyBackup ?? "(none existed)"}`);
       return;
     }
+    case "reset-progress": {
+      if (!yes) {
+        throw new Error(
+          "This clears all logged Honour/XP (your action list is kept). A backup is taken first. Re-run with --yes to confirm.",
+        );
+      }
+      const { resetProgress } = await import("../src/server/maintenance");
+      const r = await resetProgress(paths);
+      out(`progress reset: ${r.entriesRemoved} ledger entries removed; undo with: npm run db -- restore ${r.backup} --yes`);
+      return;
+    }
     case "export": {
       out(`exported to ${exportToJson(paths)}`);
       return;
     }
     default:
-      out("Commands: info | migrate | backup | auto-backup | list | verify <file> | restore <file> --yes | export");
+      out(
+        "Commands: info | migrate | backup | auto-backup | list | verify <file> | restore <file> --yes | export | reset-progress --yes",
+      );
       process.exitCode = command ? 1 : 0;
   }
 }

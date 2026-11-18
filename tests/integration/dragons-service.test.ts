@@ -30,7 +30,7 @@ describe("dragons service", () => {
 
   it("good actions grow only their own area's dragon", async () => {
     const gym = await createAction(db, { name: "Gym", kind: "good", points: 40, icon: "🏋️", category: "Fitness" });
-    await log(gym.id);
+    await log(gym.id, new Date(NOW.getTime() - 86_400_000)); // yesterday (one per day)
     await log(gym.id);
     const fitness = await dragon("fitness");
     expect(fitness.growth).toMatchObject({ xp: 80, stage: 3, stageName: "Hatchling" });

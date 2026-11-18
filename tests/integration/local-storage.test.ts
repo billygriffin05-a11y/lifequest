@@ -101,6 +101,32 @@ describe("local SQLite storage", () => {
     expect(await maybeAutoBackup(paths, { intervalHours: 24, retain: 2 })).toBeNull();
   });
 
+  it("reset-progress clears the ledger, keeps actions, and backs up first", async () => {
+    const { resetProgress } = await import("@/server/maintenance");
+    await withDb(async (db) => {
+      const action = await db.pointAction.create({
+        data: { name: "Gym", kind: "good", points: 20, icon: "🏋️", category: "Fitness" },
+      });
+      await db.pointEntry.create({
+        data: {
+          actionId: action.id, kind: "good", actionName: "Gym", actionIcon: "🏋️", actionCategory: "Fitness",
+          honourDelta: 20, xpDelta: 20, occurredOn: "2026-11-18", idempotencyKey: "reset-test",
+        },
+      });
+    });
+    const r = await resetProgress(paths);
+    expect(r.entriesRemoved).toBe(1);
+    expect(listBackups(paths).find((m) => m.file === r.backup)?.reason).toBe("pre-reset");
+    await withDb(async (db) => {
+      expect(await db.pointEntry.count()).toBe(0);
+      expect(await db.pointAction.count()).toBe(1);
+      expect(await db.auditEvent.count({ where: { action: "honour.reset" } })).toBe(1);
+    });
+    // Pre-reset backups are never pruned automatically.
+    pruneBackups(paths, 1);
+    expect(listBackups(paths).some((m) => m.file === r.backup)).toBe(true);
+  });
+
   it("exports all application tables to JSON", () => {
     const file = exportToJson(paths);
     const data = JSON.parse(fs.readFileSync(file, "utf8"));

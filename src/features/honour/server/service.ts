@@ -28,7 +28,7 @@ const DEVICE = "pc";
 export class HonourError extends Error {
   constructor(
     message: string,
-    readonly code: "NOT_FOUND" | "ARCHIVED" | "ALREADY_REVERSED" | "NOT_REVERSIBLE" | "CONFLICT",
+    readonly code: "NOT_FOUND" | "ARCHIVED" | "ALREADY_REVERSED" | "NOT_REVERSIBLE" | "CONFLICT" | "ALREADY_LOGGED_TODAY",
   ) {
     super(message);
   }
@@ -99,6 +99,27 @@ export async function addStarterActions(db: Db): Promise<number> {
 
 // ── Ledger ───────────────────────────────────────────────────────────────────
 
+type Tx = Prisma.TransactionClient | Db;
+
+/** True if the action has an entry on `day` that hasn't been undone. */
+async function isLoggedOnDay(tx: Tx, actionId: string, day: string): Promise<boolean> {
+  const originals = await tx.pointEntry.findMany({
+    where: { actionId, occurredOn: day, reversesEntryId: null },
+    select: { id: true },
+  });
+  if (originals.length === 0) return false;
+  const undone = await tx.pointEntry.count({ where: { reversesEntryId: { in: originals.map((o) => o.id) } } });
+  return undone < originals.length;
+}
+
+/** Action ids already logged (and not undone) today — used to show "Done today". */
+export async function getLoggedTodayActionIds(db: Db, now = new Date()): Promise<Set<string>> {
+  const day = londonDateKey(now);
+  const rows = await db.pointEntry.findMany({ where: { occurredOn: day }, select: { id: true, actionId: true, reversesEntryId: true } });
+  const undone = new Set(rows.flatMap((r) => (r.reversesEntryId ? [r.reversesEntryId] : [])));
+  return new Set(rows.filter((r) => !r.reversesEntryId && !undone.has(r.id)).map((r) => r.actionId));
+}
+
 export async function logAction(db: Db, input: { actionId: string; idempotencyKey: string }, now = new Date()) {
   const existing = await db.pointEntry.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
   if (existing) return existing; // retry of a request that already succeeded
@@ -108,8 +129,13 @@ export async function logAction(db: Db, input: { actionId: string; idempotencyKe
   if (action.archivedAt) throw new HonourError("This action is archived", "ARCHIVED");
 
   const deltas = deltasFor(action.kind as ActionKind, action.points);
+  const day = londonDateKey(now);
   try {
     return await db.$transaction(async (tx) => {
+      // One per day: an action counts at most once per calendar day (an undo frees it again).
+      if (await isLoggedOnDay(tx, action.id, day)) {
+        throw new HonourError("Already logged today — come back tomorrow (or undo today's entry).", "ALREADY_LOGGED_TODAY");
+      }
       const entry = await tx.pointEntry.create({
         data: {
           actionId: action.id,
@@ -118,7 +144,7 @@ export async function logAction(db: Db, input: { actionId: string; idempotencyKe
           actionIcon: action.icon,
           actionCategory: action.category,
           ...deltas,
-          occurredOn: londonDateKey(now),
+          occurredOn: day,
           occurredAt: now,
           idempotencyKey: input.idempotencyKey,
           updatedByDevice: DEVICE,
