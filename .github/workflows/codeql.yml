@@ -17,18 +17,17 @@ jobs:
     permissions:
       contents: read
       actions: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
         with:
           languages: javascript-typescript
           queries: security-extended
-      # This is a private repo on the free plan, so GitHub code scanning
-      # (which needs Advanced Security) can't receive uploads. Analyse
-      # locally in the job and fail the build if CodeQL finds anything.
+      # Upload to GitHub code scanning (Security tab) and also fail this
+      # check on any finding, so a PR can't merge with open CodeQL issues.
       - uses: github/codeql-action/analyze@v3
         with:
-          upload: never
           output: sarif-results
       - name: Fail on CodeQL findings
         run: |
