@@ -46,3 +46,57 @@ model AuditEvent {
   @@index([entityType, entityId])
   @@index([occurredAt])
 }
+
+// ── Honour: customisable good / bad actions ─────────────────────────────────
+
+/// A user-defined good or bad action, e.g. "Gym session" (+20, good) or
+/// "Takeaway" (15, bad). Definitions persist day to day; archiving hides an
+/// action from logging without losing its history.
+model PointAction {
+  id              String       @id @default(cuid())
+  name            String
+  /// "good" | "bad" (validated in src/features/honour/schemas.ts)
+  kind            String
+  /// Positive magnitude. Good adds Honour (and XP); bad subtracts Honour.
+  points          Int
+  icon            String
+  category        String
+  sortOrder       Int          @default(0)
+  archivedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+  version         Int          @default(1)
+  updatedByDevice String       @default("pc")
+  entries         PointEntry[]
+
+  @@index([kind, archivedAt])
+}
+
+/// Append-only Honour/XP ledger. Never updated or deleted: an undo is a new
+/// entry that reverses the original (`reversesEntryId`). Totals are derived.
+model PointEntry {
+  id              String      @id @default(cuid())
+  actionId        String
+  action          PointAction @relation(fields: [actionId], references: [id], onDelete: Restrict)
+  /// Snapshots so history stays correct if the action is later edited.
+  kind            String
+  actionName      String
+  actionIcon      String
+  /// Signed change to the Honour score.
+  honourDelta     Int
+  /// Change to XP (good actions only; negative only when reversing a good entry).
+  xpDelta         Int
+  /// Local calendar day (Europe/London), YYYY-MM-DD.
+  occurredOn      String
+  occurredAt      DateTime    @default(now())
+  /// Client-generated key: a retried request never creates a second entry.
+  idempotencyKey  String      @unique
+  /// Set on reversal entries; unique so an entry can only be undone once.
+  reversesEntryId String?     @unique
+  createdAt       DateTime    @default(now())
+  updatedByDevice String      @default("pc")
+
+  @@index([occurredOn])
+  @@index([actionId])
+}
