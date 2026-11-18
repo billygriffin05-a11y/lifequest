@@ -19,23 +19,35 @@ export function keyFile(paths: DataPaths): string {
   return path.join(paths.root, "secrets", "token.key");
 }
 
-/** Load the key, creating it on first use. */
+function readKey(file: string): Buffer {
+  const key = Buffer.from(fs.readFileSync(file, "utf8").trim(), "base64");
+  if (key.length !== 32) throw new Error("Token encryption key is corrupt.");
+  return key;
+}
+
+const isCode = (err: unknown, code: string) => (err as NodeJS.ErrnoException | null)?.code === code;
+
+/**
+ * Load the key, creating it on first use. No check-then-act: we just try to
+ * read, and only on ENOENT create it exclusively ("wx"); if another process
+ * won that race (EEXIST) we read theirs.
+ */
 export function getOrCreateKey(paths: DataPaths): Buffer {
   const file = keyFile(paths);
-  if (fs.existsSync(file)) {
-    const key = Buffer.from(fs.readFileSync(file, "utf8").trim(), "base64");
-    if (key.length !== 32) throw new Error("Token encryption key is corrupt.");
-    return key;
+  try {
+    return readKey(file);
+  } catch (err) {
+    if (!isCode(err, "ENOENT")) throw err;
   }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const key = crypto.randomBytes(32);
-  // "wx" fails if another process created it first; then read theirs.
   try {
     fs.writeFileSync(file, key.toString("base64"), { flag: "wx", mode: 0o600 });
-  } catch {
-    return getOrCreateKey(paths);
+    return key;
+  } catch (err) {
+    if (isCode(err, "EEXIST")) return readKey(file);
+    throw err;
   }
-  return key;
 }
 
 export function encryptSecret(plain: string, key: Buffer): string {

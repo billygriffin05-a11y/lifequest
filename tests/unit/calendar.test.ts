@@ -27,6 +27,28 @@ describe("token encryption", () => {
   });
 });
 
+describe("encryption key file", () => {
+  it("is created once and then reused", async () => {
+    const { getOrCreateKey, keyFile } = await import("@/server/secrets/crypto");
+    const fs = await import("node:fs");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { getDataPaths } = await import("@/server/config/paths");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "lifequest-key-"));
+    try {
+      const paths = getDataPaths({ LIFEQUEST_DATA_DIR: root });
+      const a = getOrCreateKey(paths);
+      const b = getOrCreateKey(paths);
+      expect(a.equals(b)).toBe(true);
+      expect(a).toHaveLength(32);
+      fs.writeFileSync(keyFile(paths), "short");
+      expect(() => getOrCreateKey(paths)).toThrow(/corrupt/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("google config", () => {
   it("is null until both client id and secret are set", () => {
     expect(googleConfig({})).toBeNull();
