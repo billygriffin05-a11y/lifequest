@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { prisma } from "@/server/db/client";
 import { LIFEQUEST_TIME_ZONE } from "../rules";
 import { addStarterActionsAction, setArchivedAction } from "../server/actions";
-import { getDailyTrend, getSummary, getTodayEntries, listActions, TREND_RANGES, type TrendRange } from "../server/service";
+import { getDailyTrend, getLoggedTodayActionIds, getSummary, getTodayEntries, listActions, TREND_RANGES, type TrendRange } from "../server/service";
 import { ActionForm } from "./action-form";
 import { LogButton } from "./log-button";
 import { TrendChart } from "./trend-chart";
@@ -27,12 +27,13 @@ export async function HonourBoard({
 }) {
   await connection(); // personal data: always read at request time, never prerendered
   const range = parseRange((await searchParams).range);
-  const [summary, active, all, today, trend] = await Promise.all([
+  const [summary, active, all, today, trend, doneToday] = await Promise.all([
     getSummary(prisma),
     listActions(prisma),
     listActions(prisma, { includeArchived: true }),
     getTodayEntries(prisma),
     getDailyTrend(prisma, range),
+    getLoggedTodayActionIds(prisma),
   ]);
   const good = active.filter((a) => a.kind === "good");
   const bad = active.filter((a) => a.kind === "bad");
@@ -130,7 +131,7 @@ export async function HonourBoard({
               <ul className="mt-4 grid gap-3">
                 {good.map((a) => (
                   <li key={a.id}>
-                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="good" category={a.category} />
+                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="good" category={a.category} doneToday={doneToday.has(a.id)} />
                   </li>
                 ))}
               </ul>
@@ -146,7 +147,7 @@ export async function HonourBoard({
               <ul className="mt-4 grid gap-3">
                 {bad.map((a) => (
                   <li key={a.id}>
-                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="bad" category={a.category} />
+                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="bad" category={a.category} doneToday={doneToday.has(a.id)} />
                   </li>
                 ))}
               </ul>

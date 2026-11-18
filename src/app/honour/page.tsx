@@ -15,6 +15,9 @@ export default function HonourPage({ searchParams }: PageProps<"/honour">) {
         <Link href="/dragons" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           Dragon Lair
         </Link>
+        <Link href="/settings" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
+          Google Calendar
+        </Link>
       </nav>
       <header className="mb-6">
         <h1 className="font-display text-4xl font-bold tracking-wide text-gold-300">Honour</h1>

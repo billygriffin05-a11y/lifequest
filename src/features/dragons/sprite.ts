@@ -1,19 +1,29 @@
 /**
- * Procedural pixel-art dragon sprites.
+ * Procedural pixel-art elemental dragons.
  *
- * Each stage is built from simple shapes (ellipses, polygons) on a 40×40 grid,
- * then given a 1-pixel outline — the classic sprite look. Output is a list of
- * horizontal runs per palette role, so any area palette can colour it.
- * Deterministic: same (stage, mood) → same pixels.
+ * Each of the 20 stages is built from simple shapes (ellipses, polygons,
+ * bezier strokes) on a 56×40 grid and given a 1-pixel outline — a classic
+ * medieval sprite look. The result is split into animatable layers:
+ *
+ *   wing   – bat wing with finger bones (flaps)
+ *   body   – everything else (breathes)
+ *   lids   – eye pixels in body colour (blink overlay)
+ *   breath – the element's breath attack (flickers)
+ *   motes  – floating elemental particles (drift)
+ *
+ * Runs are palette roles, so each area's palette colours the same pixels.
+ * Deterministic: same (stage, mood, element) → same pixels.
  */
-import type { PaletteRole } from "./areas";
-import type { Mood } from "./rules";
+import type { Element, PaletteRole } from "./areas";
+import { UNLOCKS, type Mood } from "./rules";
 
-export const GRID = 40;
+export const GRID_W = 56;
+export const GRID_H = 40;
 const GROUND = 37;
 
 type Cell = PaletteRole | null;
 type Grid = Cell[][];
+type Pt = [number, number];
 
 export interface Run {
   x: number;
@@ -22,13 +32,35 @@ export interface Run {
   role: PaletteRole;
 }
 
-function makeGrid(): Grid {
-  return Array.from({ length: GRID }, () => Array<Cell>(GRID).fill(null));
+export interface Particle {
+  runs: Run[];
+  /** Animation delay in seconds (staggered drift). */
+  delay: number;
 }
 
-function set(g: Grid, x: number, y: number, role: PaletteRole) {
-  if (x >= 0 && y >= 0 && x < GRID && y < GRID) g[y][x] = role;
+export interface SpriteLayers {
+  wing: Run[];
+  body: Run[];
+  lids: Run[];
+  breath: Run[];
+  motes: Particle[];
+  /** Pivot for the wing flap (viewBox units). */
+  wingOrigin: Pt | null;
+  /** Pivot for the breath flicker (viewBox units). */
+  mouth: Pt | null;
 }
+
+// ── Raster helpers ───────────────────────────────────────────────────────────
+
+const makeGrid = (): Grid => Array.from({ length: GRID_H }, () => Array<Cell>(GRID_W).fill(null));
+
+function set(g: Grid, x: number, y: number, role: PaletteRole) {
+  const xi = Math.round(x);
+  const yi = Math.round(y);
+  if (xi >= 0 && yi >= 0 && xi < GRID_W && yi < GRID_H) g[yi][xi] = role;
+}
+
+const get = (g: Grid, x: number, y: number): Cell => g[y]?.[x] ?? null;
 
 function ellipse(g: Grid, cx: number, cy: number, rx: number, ry: number, role: PaletteRole, only?: (x: number, y: number) => boolean) {
   for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry + 1); y++) {
@@ -40,7 +72,7 @@ function ellipse(g: Grid, cx: number, cy: number, rx: number, ry: number, role: 
   }
 }
 
-function polygon(g: Grid, pts: readonly [number, number][], role: PaletteRole) {
+function polygon(g: Grid, pts: readonly Pt[], role: PaletteRole) {
   const xs = pts.map((p) => p[0]);
   const ys = pts.map((p) => p[1]);
   for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++) {
@@ -58,162 +90,217 @@ function polygon(g: Grid, pts: readonly [number, number][], role: PaletteRole) {
   }
 }
 
-function line(g: Grid, x0: number, y0: number, x1: number, y1: number, role: PaletteRole) {
+function line(g: Grid, [x0, y0]: Pt, [x1, y1]: Pt, role: PaletteRole) {
   const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
-  for (let i = 0; i <= steps; i++) {
-    set(g, Math.round(x0 + ((x1 - x0) * i) / steps), Math.round(y0 + ((y1 - y0) * i) / steps), role);
+  for (let i = 0; i <= steps; i++) set(g, x0 + ((x1 - x0) * i) / steps, y0 + ((y1 - y0) * i) / steps, role);
+}
+
+/** Tapering stroke along a quadratic bezier (horns). */
+function bezierStroke(g: Grid, p0: Pt, p1: Pt, p2: Pt, r0: number, r1: number, role: PaletteRole) {
+  const n = 16;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = (1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0];
+    const y = (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1];
+    const r = r0 + (r1 - r0) * t;
+    ellipse(g, x, y, Math.max(0.55, r), Math.max(0.55, r), role);
   }
 }
+
+/** Deterministic pseudo-random in [0, 1). */
+function noise(x: number, y: number, seed: number): number {
+  let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed, 2147483647)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+const FREE_FLOATING: ReadonlySet<Cell> = new Set<Cell>(["aura", "outline", null]);
 
 /** Add a 1-px outline around every filled pixel (aura sparkles stay free-floating). */
 function addOutline(g: Grid) {
   const out = g.map((row) => row.slice());
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
+  for (let y = 0; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) {
       if (g[y][x] !== null) continue;
-      const near = [
-        [x + 1, y],
-        [x - 1, y],
-        [x, y + 1],
-        [x, y - 1],
-      ].some(([nx, ny]) => {
-        const c = g[ny]?.[nx];
-        return c != null && c !== "aura" && c !== "outline";
-      });
+      const near = [get(g, x + 1, y), get(g, x - 1, y), get(g, x, y + 1), get(g, x, y - 1)].some((c) => !FREE_FLOATING.has(c));
       if (near) out[y][x] = "outline";
     }
   }
-  for (let y = 0; y < GRID; y++) g[y] = out[y];
+  for (let y = 0; y < GRID_H; y++) g[y] = out[y];
 }
 
-function drawEgg(g: Grid, cracked: boolean) {
-  const cx = 20;
+function toRuns(g: Grid): Run[] {
+  const runs: Run[] = [];
+  for (let y = 0; y < GRID_H; y++) {
+    let x = 0;
+    while (x < GRID_W) {
+      const role = g[y][x];
+      if (role === null) {
+        x++;
+        continue;
+      }
+      let w = 1;
+      while (x + w < GRID_W && g[y][x + w] === role) w++;
+      runs.push({ x, y, w, role });
+      x += w;
+    }
+  }
+  return runs;
+}
+
+// ── Eggs ─────────────────────────────────────────────────────────────────────
+
+function drawEgg(g: Grid, mode: "plain" | "glowing" | "hatching") {
+  const cx = 28;
   const cy = 27;
-  const top = cracked ? 24 : 0; // hatching: only the lower shell remains
-  ellipse(g, cx, cy, 7.5, 9.5, "belly", (_x, y) => y >= top || !cracked);
-  ellipse(g, cx + 3.5, cy + 3, 4.5, 6, "bellyShade", (x, y) => x > cx + 1 && (y >= top || !cracked));
-  if (cracked) {
-    // jagged broken rim
-    for (let x = 13; x <= 27; x++) if (x % 3 === 0) set(g, x, top - 1, "belly");
-  }
+  const top = mode === "hatching" ? 24 : -1;
+  const keep = (_x: number, y: number) => y >= top;
+  ellipse(g, cx, cy, 7.5, 9.5, "belly", keep);
+  ellipse(g, cx + 3.5, cy + 3, 4.5, 6, "bellyShade", (x, y) => x > cx + 1 && keep(x, y));
+  if (mode === "hatching") for (let x = 21; x <= 35; x++) if (x % 3 === 0) set(g, x, top - 1, "belly");
   for (const [sx, sy, r] of [
-    [17, 22, 1.6],
-    [23, 26, 1.3],
-    [16, 31, 1.2],
-    [22, 33, 1.5],
+    [25, 22, 1.6],
+    [31, 26, 1.3],
+    [24, 31, 1.2],
+    [30, 33, 1.5],
   ] as const) {
-    if (!cracked || sy >= top) ellipse(g, sx, sy, r, r, "spot");
+    if (sy >= top) ellipse(g, sx, sy, r, r, "spot");
+  }
+  if (mode === "glowing") {
+    // Element light leaking through zig-zag cracks.
+    line(g, [24, 21], [27, 24], "glow");
+    line(g, [27, 24], [25, 27], "glow");
+    line(g, [25, 27], [29, 30], "glow");
+    line(g, [32, 22], [30, 25], "glow");
+    line(g, [30, 25], [33, 28], "glow");
   }
 }
 
-interface Shape {
-  s: number;
+// ── Dragon ───────────────────────────────────────────────────────────────────
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** Body scale: hatchling (stage 3) 0.5 → Eternal (stage 19) 1.0. */
+const scaleFor = (stage: number) => 0.5 + ((Math.min(19, stage) - 3) / 16) * 0.5;
+
+interface Frame {
+  k: number;
+  dx: number;
 }
 
-/** Scale around the ground centre so every stage stands on the same floor. */
-function sc(shape: Shape, x: number, y: number): [number, number] {
-  return [20 + (x - 20) * shape.s, GROUND - (GROUND - y) * shape.s];
-}
+/** Scale around the ground centre, then shift right by dx. */
+const sc = (f: Frame, x: number, y: number): Pt => [20 + (x - 20) * f.k + f.dx, GROUND - (GROUND - y) * f.k];
 
-function drawEye(g: Grid, ex: number, ey: number, mood: Mood) {
+/** Draws the eye; returns the eye pixels so the blink layer can cover them. */
+function drawEye(g: Grid, ex: number, ey: number, mood: Mood, fierce: boolean): Pt[] {
   const x = Math.round(ex);
   const y = Math.round(ey);
-  switch (mood) {
-    case "joyful":
-      set(g, x - 1, y + 1, "eye");
-      set(g, x, y, "eye");
-      set(g, x + 1, y + 1, "eye");
-      set(g, x - 1, y + 3, "blush");
-      set(g, x, y + 3, "blush");
-      break;
-    case "restless":
-      set(g, x - 1, y + 1, "eye");
-      set(g, x, y + 1, "eye");
-      set(g, x + 1, y + 1, "eye");
-      break;
-    case "grumpy":
-      set(g, x, y, "eye");
-      set(g, x + 1, y, "eye");
-      set(g, x, y + 1, "eye");
-      set(g, x + 1, y + 1, "eye");
-      set(g, x - 1, y - 2, "outline");
-      set(g, x, y - 2, "outline");
-      set(g, x + 1, y - 1, "outline");
-      set(g, x + 2, y - 1, "outline");
-      break;
-    default:
-      set(g, x, y, "eye");
-      set(g, x + 1, y, "eye");
-      set(g, x, y + 1, "eye");
-      set(g, x + 1, y + 1, "eye");
-      set(g, x, y, "eyeShine");
+  const eye: [number, number, PaletteRole][] = [];
+  const brow: Pt[] = [];
+  if (fierce) {
+    if (mood === "restless") eye.push([x, y, "shade"], [x + 1, y, "shade"]);
+    else {
+      eye.push([x, y, "glow"], [x + 1, y, "glow"]);
+      if (mood === "joyful") eye.push([x + 2, y, "glow"]);
+    }
+    if (mood === "grumpy") brow.push([x - 1, y - 2], [x, y - 1], [x + 1, y - 1], [x + 2, y - 1]);
+    else brow.push([x - 1, y - 1], [x, y - 1], [x + 1, y - 1]);
+  } else {
+    switch (mood) {
+      case "joyful":
+        eye.push([x - 1, y + 1, "eye"], [x, y, "eye"], [x + 1, y + 1, "eye"]);
+        set(g, x - 1, y + 3, "blush");
+        set(g, x, y + 3, "blush");
+        break;
+      case "restless":
+        eye.push([x - 1, y + 1, "eye"], [x, y + 1, "eye"], [x + 1, y + 1, "eye"]);
+        break;
+      case "grumpy":
+        eye.push([x, y, "eye"], [x + 1, y, "eye"], [x, y + 1, "eye"], [x + 1, y + 1, "eye"]);
+        brow.push([x - 1, y - 2], [x, y - 2], [x + 1, y - 1], [x + 2, y - 1]);
+        break;
+      default:
+        eye.push([x, y, "eyeShine"], [x + 1, y, "eye"], [x, y + 1, "eye"], [x + 1, y + 1, "eye"]);
+    }
   }
+  for (const [px, py, role] of eye) set(g, px, py, role);
+  for (const [px, py] of brow) set(g, px, py, "outline");
+  return eye.map(([px, py]) => [px, py]);
 }
 
-const SCALE_BY_STAGE = [0, 0, 0.56, 0.62, 0.68, 0.75, 0.82, 0.88, 0.94, 1];
+interface DragonResult {
+  wingOrigin: Pt | null;
+  mouth: Pt;
+  eyes: Pt[];
+}
 
-function drawDragon(g: Grid, stage: number, mood: Mood) {
-  const shape = { s: SCALE_BY_STAGE[stage] };
-  const k = shape.s;
-  // Young dragons get proportionally bigger heads (cute), older ones leaner.
-  const headR = 5.4 * k * (1 + (1 - k) * 0.7);
+function drawWing(w: Grid, f: Frame, stage: number): Pt {
+  const span = 0.55 + ((stage - UNLOCKS.wings) / (19 - UNLOCKS.wings)) * 0.9;
+  const [ax, ay] = sc(f, 18, 22);
+  const tipH = 13 * f.k * span;
+  const tipW = 11 * f.k * span;
+  const back: Pt = [ax - tipW * 0.8, ay - tipH * 0.8];
+  const top: Pt = [ax - tipW * 0.12, ay - tipH * 1.1];
+  const front: Pt = [ax + tipW * 0.55, ay - tipH * 0.72];
+  const anchor: Pt = [ax, ay];
+  const scallop = (a: Pt, b: Pt): Pt => [lerp((a[0] + b[0]) / 2, anchor[0], 0.28), lerp((a[1] + b[1]) / 2, anchor[1], 0.28)];
+  polygon(
+    w,
+    [
+      [ax + 3 * f.k, ay + 1],
+      front,
+      scallop(front, top),
+      top,
+      scallop(top, back),
+      back,
+      [ax - tipW * 0.4, ay - tipH * 0.2],
+      [ax - 1, ay + 1],
+    ],
+    "wing",
+  );
+  // Finger bones + arm, claw at the wrist
+  for (const tip of [back, top, front]) line(w, [Math.round(ax), Math.round(ay)], [Math.round(tip[0]), Math.round(tip[1])], "wingShade");
+  line(w, [Math.round(ax) + 1, Math.round(ay)], [Math.round(top[0]) + 1, Math.round(top[1])], "wingShade");
+  set(w, top[0], top[1] - 1, "horn");
+  addOutline(w);
+  return [ax, ay];
+}
 
-  const [bx, by] = sc(shape, 19, 27);
+function drawDragon(g: Grid, w: Grid, stage: number, mood: Mood): DragonResult {
+  const f: Frame = { k: scaleFor(stage), dx: stage >= UNLOCKS.breath ? 3 : 8 };
+  const { k } = f;
+  const fierce = stage >= UNLOCKS.fangs;
+  const headR = 5.4 * k * (1 + (1 - k) * 0.8);
+
+  const [bx, by] = sc(f, 19, 27);
   const brx = 9 * k;
   const bry = 6.5 * k;
-  const [hx, hy] = sc(shape, 29, 16.5);
+  const [hx, hy] = sc(f, 29, 16.5);
 
-  // Wings (behind body)
-  if (stage >= 4) {
-    const span = 0.55 + (stage - 4) * 0.18;
-    const [ax, ay] = sc(shape, 18, 22);
-    const tipH = 13 * k * span;
-    const tipW = 11 * k * span;
-    const wing: [number, number][] = [
-      [ax + 3 * k, ay],
-      [ax - tipW * 0.55, ay - tipH],
-      [ax + tipW * 0.25, ay - tipH * 1.08],
-      [ax + tipW * 0.7, ay - tipH * 0.45],
-      [ax + 5 * k, ay + 1],
-    ];
-    polygon(g, wing, "wing");
-    line(g, Math.round(ax + 3 * k), Math.round(ay), Math.round(ax - tipW * 0.55), Math.round(ay - tipH), "wingShade");
-    line(g, Math.round(ax + 3 * k), Math.round(ay), Math.round(ax + tipW * 0.25), Math.round(ay - tipH * 1.08), "wingShade");
-  }
+  const wingOrigin = stage >= UNLOCKS.wings ? drawWing(w, f, stage) : null;
 
-  // Tail: tapering circles curling up and back
-  const tailLen = (4 + stage * 1.1) * (stage >= 2 ? 1 : 0);
+  // Tail: tapering, curling up and back
+  const tailLen = 4 + (stage - 3) * 0.7;
   const [tx0, ty0] = [bx - brx * 0.85, by + bry * 0.25];
-  let tipX = tx0;
-  let tipY = ty0;
-  const segments = 14;
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
+  let tip: Pt = [tx0, ty0];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
     const x = tx0 - tailLen * t * 0.85;
     const y = ty0 - Math.sin(t * Math.PI * 0.85) * tailLen * 0.45 + t * 1.5;
     const r = Math.max(0.9, bry * 0.42 * (1 - t * 0.8));
     ellipse(g, x, y, r, r, "body");
-    tipX = x;
-    tipY = y;
+    tip = [x, y];
   }
-  if (stage >= 5) {
-    polygon(
-      g,
-      [
-        [tipX + 0.5, tipY],
-        [tipX - 2.6, tipY - 2.4],
-        [tipX - 2.2, tipY + 1.6],
-      ],
-      "accent",
-    );
+  if (stage >= UNLOCKS.tailBlade) {
+    polygon(g, [[tip[0] + 0.5, tip[1]], [tip[0] - 3, tip[1] - 2.6], [tip[0] - 2.4, tip[1] + 1.8]], "accent");
   }
 
-  // Legs
+  // Legs with claws
   const legW = Math.max(2, Math.round(2.8 * k));
   for (const lx of [bx - brx * 0.45, bx + brx * 0.45]) {
-    for (let y = Math.round(by + bry * 0.4); y <= GROUND - 1; y++) {
-      for (let x = Math.round(lx - legW / 2); x < Math.round(lx - legW / 2) + legW; x++) set(g, x, y, "shade");
-    }
+    const x0 = Math.round(lx - legW / 2);
+    for (let y = Math.round(by + bry * 0.4); y <= GROUND - 1; y++) for (let x = x0; x < x0 + legW; x++) set(g, x, y, "shade");
+    set(g, x0 + legW, GROUND - 1, "horn");
   }
 
   // Body, neck, head, snout
@@ -222,149 +309,285 @@ function drawDragon(g: Grid, stage: number, mood: Mood) {
   ellipse(g, hx, hy, headR, headR * 0.92, "body");
   const snoutX = hx + headR * 0.85;
   const snoutY = hy + headR * 0.35;
-  ellipse(g, snoutX, snoutY, headR * 0.62, headR * 0.45, "body");
-  set(g, Math.round(snoutX + headR * 0.35), Math.round(snoutY - headR * 0.15), "outline"); // nostril
+  ellipse(g, snoutX, snoutY, headR * 0.62 * (fierce ? 1.15 : 1), headR * 0.45, "body");
 
-  // Under-shading and belly
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
-      if (g[y][x] === "body" && y > by + bry * 0.45) g[y][x] = "shade";
-    }
+  // Under-shading, rim light, belly
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) if (g[y][x] === "body" && y > by + bry * 0.45) g[y][x] = "shade";
+  for (let y = 1; y < GRID_H; y++) {
+    for (let x = 0; x < GRID_W; x++) if (g[y][x] === "body" && g[y - 1][x] === null && y < by) g[y][x] = "highlight";
   }
-  ellipse(g, bx + brx * 0.25, by + bry * 0.3, brx * 0.55, bry * 0.55, "belly", (x, y) => g[y]?.[x] === "body" || g[y]?.[x] === "shade");
-  ellipse(g, (bx + hx) / 2 + 2.2, (by + hy) / 2 + 2, headR * 0.3, (by - hy) / 2, "belly", (x, y) => g[y]?.[x] === "body");
-  if (stage >= 8) {
-    // belly plates
+  const isFlesh = (x: number, y: number) => get(g, x, y) === "body" || get(g, x, y) === "shade";
+  ellipse(g, bx + brx * 0.25, by + bry * 0.3, brx * 0.55, bry * 0.55, "belly", isFlesh);
+  ellipse(g, (bx + hx) / 2 + 2.2, (by + hy) / 2 + 2, headR * 0.3, (by - hy) / 2, "belly", (x, y) => get(g, x, y) === "body");
+  if (stage >= UNLOCKS.plates) {
     for (let y = Math.round(by - bry * 0.1); y < by + bry * 0.8; y += 2) {
-      for (let x = 0; x < GRID; x++) if (g[y]?.[x] === "belly") g[y][x] = "bellyShade";
+      for (let x = 0; x < GRID_W; x++) if (g[y]?.[x] === "belly") g[y][x] = "bellyShade";
     }
   }
 
-  // Horns
-  if (stage >= 3) {
-    const hornLen = 1.8 + (stage - 3) * 0.6;
-    for (const off of stage >= 8 ? [-0.55, -0.1] : [-0.3]) {
-      const baseX = hx + headR * off;
-      const baseY = hy - headR * 0.75;
-      polygon(
-        g,
-        [
-          [baseX - 1.2, baseY + 1],
-          [baseX + 1.2, baseY + 1],
-          [baseX - hornLen * 0.7, baseY - hornLen],
-        ],
-        "accent",
-      );
+  // Nostril, jaw line and fangs
+  set(g, snoutX + headR * 0.35, snoutY - headR * 0.15, "outline");
+  if (fierce) {
+    const jawY = Math.round(snoutY + headR * 0.2);
+    for (let x = Math.round(hx); x <= Math.round(snoutX + headR * 0.5); x++) if (get(g, x, jawY)) set(g, x, jawY, "shade");
+    set(g, snoutX + headR * 0.45, snoutY + headR * 0.55, "eyeShine");
+    set(g, snoutX - headR * 0.05, snoutY + headR * 0.55, "eyeShine");
+  }
+
+  // Curved horns (medieval, swept back)
+  if (stage >= UNLOCKS.horns) {
+    const L = 2 + (stage - UNLOCKS.horns) * 0.45;
+    const horns = stage >= UNLOCKS.twinHorns ? [-0.15, -0.55] : [-0.25];
+    for (const off of horns) {
+      const base: Pt = [hx + headR * off, hy - headR * 0.72];
+      bezierStroke(g, base, [base[0] - L * 0.35, base[1] - L * 0.9], [base[0] - L * 1.05, base[1] - L * 0.55], 1.25 * Math.min(1.4, 0.7 + k * 0.6), 0.5, "horn");
     }
   }
 
-  // Back spikes
-  if (stage >= 6) {
-    const count = stage >= 8 ? 5 : 4;
+  // Crest frill behind the head
+  if (stage >= UNLOCKS.crest) {
+    for (let i = 0; i < 3; i++) {
+      const cx = hx - headR * (0.75 + i * 0.25);
+      const cy = hy - headR * (0.1 - i * 0.25);
+      polygon(g, [[cx, cy - 1], [cx + 1.4, cy + 1], [cx - 2.4, cy + 0.4]], "accent");
+    }
+  }
+
+  // Back spines
+  if (stage >= UNLOCKS.spines) {
+    const count = Math.min(7, 3 + Math.floor((stage - UNLOCKS.spines) / 2));
+    const h = 1.4 + (stage - UNLOCKS.spines) * 0.15;
     for (let i = 0; i < count; i++) {
       const t = (i + 0.5) / count;
-      const sx = bx - brx * 0.7 + t * brx * 1.3;
+      const sx = bx - brx * 0.75 + t * brx * 1.35;
       const sy = by - bry * Math.sqrt(Math.max(0, 1 - ((sx - bx) / brx) ** 2)) + 0.5;
-      const h = 1.6 + (stage - 6) * 0.4;
-      polygon(
-        g,
-        [
-          [sx - 1.1, sy],
-          [sx + 1.1, sy],
-          [sx - 0.4, sy - h],
-        ],
-        "accent",
-      );
+      polygon(g, [[sx - 1.1, sy], [sx + 1.1, sy], [sx - 0.5, sy - h]], "horn");
     }
   }
 
-  // Eye
-  drawEye(g, hx + headR * 0.2, hy - headR * 0.25, mood);
+  const eyes = drawEye(g, hx + headR * 0.2, hy - headR * 0.25, mood, fierce);
 
   addOutline(g);
 
-  // Ancient: golden crown + sparkles (drawn after outline so they float)
-  if (stage >= 9) {
+  if (stage >= UNLOCKS.aura) {
     for (const [x, y] of [
-      [Math.round(hx - 2), Math.round(hy - headR - 3)],
-      [Math.round(hx), Math.round(hy - headR - 4)],
-      [Math.round(hx + 2), Math.round(hy - headR - 3)],
-    ]) {
-      set(g, x, y, "aura");
-      set(g, x, y + 1, "aura");
-    }
-    for (let x = Math.round(hx - 2); x <= Math.round(hx + 2); x++) set(g, x, Math.round(hy - headR - 1), "aura");
-    for (const [x, y] of [
-      [3, 6],
-      [36, 4],
+      [4, 6],
+      [40, 3],
       [6, 30],
-      [37, 25],
-      [12, 2],
-    ]) {
-      if (g[y][x] === null) {
-        set(g, x, y, "aura");
-        set(g, x - 1, y, "aura");
-        set(g, x + 1, y, "aura");
-        set(g, x, y - 1, "aura");
-        set(g, x, y + 1, "aura");
+      [14, 2],
+      [2, 18],
+    ] as const) {
+      if (g[y][x] === null) for (const [ox, oy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) set(g, x + ox, y + oy, "aura");
+    }
+  }
+  if (stage >= UNLOCKS.crown) {
+    const top = Math.round(hy - headR - 1);
+    for (let x = Math.round(hx - 2); x <= Math.round(hx + 2); x++) set(g, x, top, "aura");
+    for (const dx of [-2, 0, 2]) {
+      set(g, hx + dx, top - 1, "aura");
+      if (dx === 0) set(g, hx, top - 2, "aura");
+    }
+  }
+
+  return { wingOrigin, mouth: [Math.round(snoutX + headR * 0.6), Math.round(snoutY + headR * 0.05)], eyes };
+}
+
+// ── Breath attacks ───────────────────────────────────────────────────────────
+
+function drawBreath(b: Grid, element: Element, [mx, my]: Pt, stage: number, mood: Mood) {
+  if (mood === "grumpy") {
+    // Sulky smoke puffs, whatever the element.
+    ellipse(b, mx + 2, my - 2, 1, 1, "breathOuter");
+    ellipse(b, mx + 4, my - 4, 1.4, 1.4, "breathOuter");
+    ellipse(b, mx + 7, my - 5, 1.8, 1.6, "breathOuter");
+    set(b, mx + 4, my - 4, "breathMid");
+    return;
+  }
+  const len = Math.min(GRID_W - 1 - mx, Math.round(3 + (stage - UNLOCKS.breath) * 1.05 + (mood === "joyful" ? 3 : 0)));
+  const cone = (spread: number, sparse: number, seed: number) => {
+    for (let d = 1; d <= len; d++) {
+      const h = 0.8 + d * spread;
+      for (let y = Math.floor(my - h - 1); y <= Math.ceil(my + h + 1); y++) {
+        const r = Math.abs(y + 0.5 - (my + 0.5)) / h;
+        const n = noise(d, y, seed);
+        if (r > 1 - n * 0.35 * (d / len)) continue;
+        if (n < sparse) continue;
+        if (d > len * 0.75 && n > 0.62) continue; // flickering tip
+        set(b, mx + d, y, r < 0.33 ? "breathCore" : r < 0.68 ? "breathMid" : "breathOuter");
       }
     }
+  };
+
+  switch (element) {
+    case "fire":
+      cone(0.42, 0, 1);
+      break;
+    case "plasma":
+      cone(0.3, 0, 2);
+      for (let d = 4; d <= len; d += 4) {
+        const h = Math.round(0.8 + d * 0.3) + 1;
+        set(b, mx + d, my - h, "breathOuter");
+        set(b, mx + d, my + h, "breathOuter");
+      }
+      break;
+    case "ice":
+      cone(0.38, 0.35, 3);
+      for (let d = 3; d <= len - 1; d += 3) {
+        const off = Math.round((noise(d, 0, 9) - 0.5) * (2 + d * 0.5));
+        set(b, mx + d, my + off, "breathCore");
+        set(b, mx + d + 1, my + off - 1, "breathCore");
+      }
+      break;
+    case "water":
+      for (let d = 1; d <= len; d++) {
+        const h = 0.6 + d * 0.1;
+        for (let y = Math.floor(my - h); y <= Math.ceil(my + h); y++) {
+          const r = Math.abs(y - my) / (h + 0.5);
+          set(b, mx + d, y, r < 0.45 ? "breathCore" : r < 0.9 ? "breathMid" : "breathOuter");
+        }
+        if (d % 3 === 0 && noise(d, 1, 4) > 0.35) set(b, mx + d, my + (noise(d, 2, 4) > 0.5 ? 1 : -1) * Math.round(h + 2), "breathCore");
+      }
+      break;
+    case "air":
+      for (let d = 1; d <= len; d++) {
+        for (const kk of [-1, 0, 1]) {
+          const y = my + kk * (1.2 + d * 0.22) + Math.sin(d * 0.7 + kk * 2) * 1.2;
+          set(b, mx + d, y, kk === 0 ? "breathCore" : "breathMid");
+          if (d % 2 === 0) set(b, mx + d, y + 1, "breathOuter");
+        }
+      }
+      break;
+    case "earth":
+      for (let d = 2; d < len; d += 2) {
+        const off = (noise(d, 0, 5) - 0.5) * 2 * (1 + d * 0.35);
+        const x = mx + d;
+        const y = my + off;
+        set(b, x, y, "breathCore");
+        set(b, x + 1, y, "breathOuter");
+        set(b, x, y + 1, "breathOuter");
+        set(b, x + 1, y + 1, "breathOuter");
+      }
+      cone(0.4, 0.78, 6);
+      break;
+    case "lightning":
+      for (const [start, seed] of [
+        [0, 7],
+        [Math.floor(len / 3), 8],
+      ] as const) {
+        let y = my;
+        for (let d = start + 1; d <= len; d++) {
+          const limit = 1 + d * 0.32;
+          y += noise(d, seed, seed) > 0.5 ? 1 : -1;
+          y = Math.max(my - limit, Math.min(my + limit, y));
+          set(b, mx + d, y, "breathCore");
+          if (get(b, mx + d, y - 1) === null) set(b, mx + d, y - 1, "breathMid");
+          if (noise(d, seed, 3) > 0.7) set(b, mx + d, y + 1, "breathOuter");
+        }
+      }
+      break;
+    case "shadow":
+      for (let d = 2; d <= len; d += 2) {
+        const r = 0.8 + d * 0.18;
+        const y = my + (noise(d, 0, 10) - 0.5) * 2;
+        ellipse(b, mx + d, y, r, r, "breathOuter");
+        ellipse(b, mx + d, y, r * 0.5, r * 0.5, "breathMid");
+        if (noise(d, 1, 10) > 0.5) set(b, mx + d, y - r, "breathCore");
+      }
+      break;
   }
 }
 
-function buildGrid(stage: number, mood: Mood): Grid {
+// ── Elemental motes ──────────────────────────────────────────────────────────
+
+const MOTE_SHAPES: Record<Element, [number, number, PaletteRole][]> = {
+  fire: [[0, 0, "breathCore"], [0, 1, "breathMid"], [1, 1, "breathOuter"]],
+  earth: [[0, 0, "breathMid"], [1, 0, "breathOuter"], [0, 1, "breathOuter"], [1, 1, "breathOuter"]],
+  lightning: [[0, 0, "breathCore"], [1, 1, "breathMid"], [0, 2, "breathCore"]],
+  plasma: [[1, 0, "breathMid"], [0, 1, "breathMid"], [1, 1, "breathCore"], [2, 1, "breathMid"], [1, 2, "breathMid"]],
+  water: [[1, 0, "breathMid"], [0, 1, "breathMid"], [1, 1, "breathCore"], [2, 1, "breathMid"], [1, 2, "breathOuter"]],
+  ice: [[1, 0, "breathCore"], [0, 1, "breathCore"], [1, 1, "breathMid"], [2, 1, "breathCore"], [1, 2, "breathCore"]],
+  air: [[0, 0, "breathMid"], [1, 0, "breathCore"], [2, 1, "breathMid"]],
+  shadow: [[0, 0, "breathOuter"], [1, 0, "breathMid"], [1, 1, "breathOuter"], [2, 1, "breathCore"]],
+};
+
+const MOTE_SPOTS: readonly Pt[] = [
+  [7, 7],
+  [44, 6],
+  [3, 22],
+  [31, 3],
+  [15, 13],
+  [48, 33],
+];
+
+function motes(element: Element, stage: number): Particle[] {
+  if (stage < UNLOCKS.motes) return [];
+  const count = Math.min(MOTE_SPOTS.length, stage - UNLOCKS.motes + 1);
+  return MOTE_SPOTS.slice(0, count).map(([x, y], i) => ({
+    runs: MOTE_SHAPES[element].map(([ox, oy, role]) => ({ x: x + ox, y: y + oy, w: 1, role })),
+    delay: +(i * 0.55).toFixed(2),
+  }));
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+function build(stage: number, mood: Mood, element: Element): SpriteLayers {
   const g = makeGrid();
+  const w = makeGrid();
+  const b = makeGrid();
+  let eyes: Pt[] = [];
+  let wingOrigin: Pt | null = null;
+  let mouth: Pt | null = null;
+
   if (stage <= 0) {
-    drawEgg(g, false);
+    drawEgg(g, "plain");
     addOutline(g);
   } else if (stage === 1) {
-    // Hatching: a little head peeks out of the cracked shell.
-    const [hx, hy] = [20, 21];
+    drawEgg(g, "glowing");
+    addOutline(g);
+  } else if (stage === 2) {
+    const [hx, hy] = [28, 21];
     ellipse(g, hx, hy, 4.6, 4.2, "body");
     ellipse(g, hx + 3.6, hy + 1.4, 2.4, 1.8, "body");
-    drawEye(g, hx + 1, hy - 1.5, mood);
-    drawEgg(g, true);
+    eyes = drawEye(g, hx + 1, hy - 1.5, mood, false);
+    drawEgg(g, "hatching");
     addOutline(g);
   } else {
-    drawDragon(g, stage, mood);
-  }
-  return g;
-}
-
-function toRuns(g: Grid): Run[] {
-  const runs: Run[] = [];
-  for (let y = 0; y < GRID; y++) {
-    let x = 0;
-    while (x < GRID) {
-      const role = g[y][x];
-      if (role === null) {
-        x++;
-        continue;
-      }
-      let w = 1;
-      while (x + w < GRID && g[y][x + w] === role) w++;
-      runs.push({ x, y, w, role });
-      x += w;
+    const r = drawDragon(g, w, stage, mood);
+    eyes = r.eyes;
+    wingOrigin = r.wingOrigin;
+    if (stage >= UNLOCKS.breath && mood !== "restless") {
+      mouth = r.mouth;
+      drawBreath(b, element, r.mouth, stage, mood);
     }
   }
-  return runs;
+
+  const lids = eyes
+    .filter(([x, y]) => x >= 0 && y >= 0 && x < GRID_W && y < GRID_H)
+    .map(([x, y]) => ({ x, y, w: 1, role: "body" as const }));
+
+  return { wing: toRuns(w), body: toRuns(g), lids, breath: toRuns(b), motes: motes(element, stage), wingOrigin, mouth };
 }
 
-const cache = new Map<string, Run[]>();
+const cache = new Map<string, SpriteLayers>();
 
-/** Pixel runs for a dragon at `stage` (0–9) with `mood`. Cached; safe to call often. */
-export function spriteRuns(stage: number, mood: Mood): Run[] {
-  const s = Math.min(9, Math.max(0, Math.floor(stage)));
-  const key = `${s}:${mood}`;
-  let runs = cache.get(key);
-  if (!runs) {
-    runs = toRuns(buildGrid(s, mood));
-    cache.set(key, runs);
+/** All animation layers for a dragon. Cached; safe to call often. */
+export function spriteLayers(stage: number, mood: Mood, element: Element): SpriteLayers {
+  const s = Math.min(19, Math.max(0, Math.floor(stage)));
+  const key = `${s}:${mood}:${element}`;
+  let layers = cache.get(key);
+  if (!layers) {
+    layers = build(s, mood, element);
+    cache.set(key, layers);
   }
-  return runs;
+  return layers;
 }
 
-/** Number of filled pixels — used by tests to check dragons grow. */
+/** Static body + wing pixels (no breath/motes) — used by tests. */
+export function spriteRuns(stage: number, mood: Mood, element: Element = "fire"): Run[] {
+  const l = spriteLayers(stage, mood, element);
+  return [...l.wing, ...l.body];
+}
+
 export function pixelCount(runs: readonly Run[]): number {
   return runs.reduce((n, r) => n + r.w, 0);
 }

@@ -47,6 +47,39 @@ model AuditEvent {
   @@index([occurredAt])
 }
 
+// ── Google Calendar integration ──────────────────────────────────────────────
+
+/// The single linked Google account. Tokens are AES-256-GCM encrypted with a
+/// key stored OUTSIDE the database (data dir /secrets). Never log them.
+model GoogleConnection {
+  id                    String   @id @default("google")
+  refreshTokenEncrypted String
+  accessTokenEncrypted  String?
+  accessTokenExpiresAt  DateTime?
+  /// The dedicated "LIFEQUEST" calendar this app created (app-created scope).
+  calendarId            String?
+  connectedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+/// Pending calendar writes. Logged deeds are queued here and pushed to Google
+/// in the background, so logging never waits on (or fails because of) Google.
+model CalendarOutbox {
+  id          String    @id @default(cuid())
+  /// "create" | "delete"
+  op          String
+  /// Deterministic Google event id (idempotent create/delete).
+  eventId     String
+  /// JSON event body for creates (summary, start, end, …).
+  payload     String?
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  doneAt      DateTime?
+
+  @@index([doneAt])
+}
+
 // ── Honour: customisable good / bad actions ─────────────────────────────────
 
 /// A user-defined good or bad action, e.g. "Gym session" (+20, good) or

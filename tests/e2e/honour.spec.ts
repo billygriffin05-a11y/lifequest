@@ -43,9 +43,12 @@ test("create custom good and bad actions, log them, and undo", async ({ page }, 
   await today.getByRole("button", { name: `Undo ${bad}` }).click();
   await expect(today.getByRole("listitem").filter({ hasText: bad }).getByText("Undone")).toBeVisible();
 
-  // Persists after reload (it's in the local database, not the browser).
+  // Persists after reload (it's in the local database, not the browser), and stays
+  // "done today" because each action counts once per day.
   await page.reload();
-  await expect(page.getByRole("button", { name: `Log ${good}: plus 7 Honour` })).toBeVisible();
+  await expect(page.getByRole("button", { name: `${good}: done today` })).toBeDisabled();
+  // The undone bad habit is free to log again.
+  await expect(page.getByRole("button", { name: `Log ${bad}: minus 3 Honour` })).toBeEnabled();
 });
 
 test("archive hides an action from logging and restore brings it back", async ({ page }, info) => {

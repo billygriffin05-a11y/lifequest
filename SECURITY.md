@@ -13,7 +13,8 @@ LIFEQUEST will hold financial, health and personal data for one person. Security
 | Data synced to a third-party cloud by accident | Data dir defaults to `%LOCALAPPDATA%` (not OneDrive); warning if a cloud-synced path is configured ✅ |
 | Data loss (bad migration, corruption, PC failure) | Pre-migrate backups ✅, verified backups ✅, safe restore ✅, scheduled backups, **external encrypted backup (you)** |
 | Leaked API secrets | Env vars only, never `NEXT_PUBLIC_`; `server-only` imports; Claude denied from reading `.env*` |
-| Token theft from DB file | OAuth tokens encrypted with AES-256-GCM; key held outside the DB (Windows Credential Manager/DPAPI planned) |
+| Token theft from DB file | OAuth tokens encrypted with AES-256-GCM ✅; key in `<data dir>/secrets/token.key`, outside the DB, backups and repo ✅ (wrapping it with Windows DPAPI is planned) |
+| OAuth login CSRF / code interception | `state` + PKCE (S256) ✅; least-privilege `calendar.app.created` scope ✅ |
 | Duplicate / manipulated rewards | Append-only ledgers, unique idempotency keys ✅, server-side calculation only, audit trail ✅ |
 | Vulnerable dependencies | `npm audit` + Dependency Review + Dependabot + CodeQL in CI; npm `allowScripts` allow-list |
 | Sensitive data in logs | Logs record IDs/counts/status only; config errors report key names, never values ✅ |

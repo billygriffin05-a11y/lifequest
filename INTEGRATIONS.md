@@ -1,13 +1,14 @@
 # Application integrations
 
-Status: **designed, not implemented.** No credentials exist yet. Each integration is built in its own phase and must be
-approved before any real account is connected.
+Status: **Google Calendar is implemented** (owner-requested; needs the owner's own Google OAuth client — see
+`/settings`). Open Banking, notifications and recipes are designed, not implemented. Each integration must be approved
+before any real account is connected.
 
 ## Data leaving the PC
 
 | Integration | What leaves the PC | Why | Stored where permanently |
 |---|---|---|---|
-| Google Calendar | OAuth tokens to Google; LIFEQUEST events you choose to push | Two-way calendar sync | Local mirror in SQLite; Google holds its own copy of synced events |
+| Google Calendar | OAuth tokens to Google; for each logged deed: its name, icon, points and time | Show deeds in a dedicated "LIFEQUEST" Google calendar | Ledger stays in SQLite (source of truth); Google holds a copy of the events |
 | Open Banking provider | OAuth consent flow; API calls with access token | Read-only import of balances/transactions | Transactions stored locally; provider/bank already hold them |
 | Web Push | Encrypted notification payload via Apple/Google/Mozilla push service | Reminders on iPhone/Windows | Not stored by LIFEQUEST externally; keep payloads minimal (no amounts/health data) |
 | Recipe publishers | HTTP request for a recipe URL you choose to import | Save genuine recipe + attribution | Metadata + URL locally |
@@ -17,6 +18,18 @@ approved before any real account is connected.
 Anything not on this list must not send personal data off the PC without an update here and your approval.
 
 ## Google Calendar
+
+**Implemented (one-way push):** `src/features/calendar`, `/settings`, `/api/integrations/google/{start,callback}`.
+- Scope: **`calendar.app.created` only** — LIFEQUEST can manage the "LIFEQUEST" calendar it creates and nothing else.
+- OAuth: authorization code + PKCE + `state` (HttpOnly cookies, 10-minute life); callback only reports fixed result codes.
+- Tokens: AES-256-GCM encrypted in the `GoogleConnection` table; key in `%LOCALAPPDATA%\LIFEQUEST\secrets\token.key`.
+- Sync: logging/undoing a deed queues a `CalendarOutbox` item; it's pushed right after the request (`after()`), retried
+  every 5 minutes, and given up after 8 attempts (shown on `/settings`). Event ids are derived from the entry id, so
+  retries never duplicate events. Logging never waits on, or fails because of, Google.
+- Unlink revokes the token at Google and forgets it locally; existing events stay in the owner's Google calendar.
+- Not yet: reading Google events into LIFEQUEST (two-way sync) — the design below still applies when that's added.
+
+Original design notes:
 
 - **Setup (you):** Google Cloud Console → new project → enable *Google Calendar API* → OAuth consent screen (External, Testing mode, add yourself as test user) → OAuth client "Web application" with redirect `http://localhost:3000/api/integrations/google/callback` (and the Tailscale HTTPS URL later). Put IDs in `.env.local`.
 - **Scopes:** start with `calendar.events` limited to a **dedicated "LIFEQUEST" calendar** the app creates, plus `calendar.readonly` for showing other events. Least privilege.

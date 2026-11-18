@@ -8,6 +8,7 @@
 import "server-only";
 import { refresh } from "next/cache";
 import { z } from "zod";
+import { onDeedLogged, onDeedUndone } from "@/features/calendar/server/runtime";
 import { prisma } from "@/server/db/client";
 import { actionInputSchema, idSchema, logInputSchema, undoInputSchema } from "../schemas";
 import * as service from "./service";
@@ -108,11 +109,13 @@ export async function addStarterActionsAction(): Promise<void> {
 export async function logActionAction(input: { actionId: string; idempotencyKey: string }): Promise<FormState> {
   const parsed = logInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Invalid request." };
+  let entry;
   try {
-    await service.logAction(prisma, parsed.data);
+    entry = await service.logAction(prisma, parsed.data);
   } catch (err) {
     return failure(err);
   }
+  await onDeedLogged(entry); // Google Calendar (if linked); never throws
   refresh();
   return { ok: true };
 }
@@ -120,11 +123,13 @@ export async function logActionAction(input: { actionId: string; idempotencyKey:
 export async function undoEntryAction(input: { entryId: string; idempotencyKey: string }): Promise<FormState> {
   const parsed = undoInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Invalid request." };
+  let reversal;
   try {
-    await service.undoEntry(prisma, parsed.data);
+    reversal = await service.undoEntry(prisma, parsed.data);
   } catch (err) {
     return failure(err);
   }
+  if (reversal.reversesEntryId) await onDeedUndone(reversal.reversesEntryId); // never throws
   refresh();
   return { ok: true };
 }
