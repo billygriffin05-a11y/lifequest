@@ -33,7 +33,7 @@ describe("dragons service", () => {
     await log(gym.id);
     await log(gym.id);
     const fitness = await dragon("fitness");
-    expect(fitness.growth).toMatchObject({ xp: 80, stage: 2, stageName: "Hatchling" });
+    expect(fitness.growth).toMatchObject({ xp: 80, stage: 3, stageName: "Hatchling" });
     expect(fitness.mood).toBe("joyful");
     expect((await dragon("finance")).growth.xp).toBe(0);
   });

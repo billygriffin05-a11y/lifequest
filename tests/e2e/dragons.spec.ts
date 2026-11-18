@@ -1,14 +1,17 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const NAMES = ["Emberclaw", "Verdantfang", "Aurumscale", "Runewing", "Inkwyrm", "Moonveil", "Jadeheart", "Ashsilver"];
+const NAMES = ["Emberclaw", "Thornback", "Stormhoard", "Arcflare", "Tidewyrm", "Frostveil", "Galewing", "Duskshade"];
 
 test("the lair shows all eight area dragons with growth and mood", async ({ page }) => {
   await page.goto("/dragons");
   await expect(page.getByRole("heading", { level: 1, name: "Dragon Lair" })).toBeVisible();
   for (const name of NAMES) await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveCount(8);
-  await expect(page.getByRole("img", { name: /Emberclaw, the Fitness dragon/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: /Emberclaw, the Fire dragon of Fitness/ })).toBeVisible();
+  for (const element of ["Fire", "Earth", "Lightning", "Plasma", "Water", "Ice", "Air", "Shadow"]) {
+    await expect(page.getByText(`${element} dragon of`)).toBeVisible();
+  }
 });
 
 test("logging a good Fitness deed feeds Emberclaw XP", async ({ page }, info) => {
@@ -33,9 +36,17 @@ test("logging a good Fitness deed feeds Emberclaw XP", async ({ page }, info) =>
   expect(xpAfter).toBeGreaterThanOrEqual(xpBefore + 5);
 });
 
-test("the gallery shows 80 sprites plus 4 moods", async ({ page }) => {
+test("the gallery shows 8 dragons x 20 stages plus 4 moods", async ({ page }) => {
   await page.goto("/dragons/gallery");
-  await expect(page.getByRole("img")).toHaveCount(84);
+  await expect(page.getByRole("img")).toHaveCount(164);
+});
+
+test("reduced motion turns dragon animation off", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/dragons/gallery");
+  const animated = page.locator(".lq-flap").first();
+  await expect(animated).toBeAttached();
+  expect(await animated.evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
 });
 
 for (const path of ["/dragons", "/dragons/gallery"]) {

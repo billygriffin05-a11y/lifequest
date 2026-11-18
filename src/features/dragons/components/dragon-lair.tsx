@@ -29,12 +29,19 @@ export async function DragonLair() {
               data-testid={`dragon-${area.id}`}
               className="flex h-full flex-col rounded-2xl border border-obsidian-600 bg-obsidian-900/80 p-4"
             >
-              <div className="mx-auto aspect-square w-40 rounded-xl bg-[radial-gradient(circle_at_50%_60%,var(--color-obsidian-700),var(--color-obsidian-950)_70%)] p-2">
+              <div
+                className="aspect-[7/5] w-full overflow-hidden rounded-xl border border-obsidian-700 p-1"
+                style={{
+                  // Elemental glow behind each dragon (art data, from its palette).
+                  background: `radial-gradient(ellipse at 45% 65%, ${area.palette.breathOuter}40, transparent 70%), #07080a`,
+                }}
+              >
                 <DragonSprite
                   stage={growth.stage}
                   mood={mood}
+                  element={area.element}
                   palette={area.palette}
-                  label={`${area.dragonName}, the ${area.name} dragon: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
+                  label={`${area.dragonName}, the ${area.elementName} dragon of ${area.name}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
                   className={`h-full w-full ${style.sprite}`}
                 />
               </div>
@@ -42,7 +49,10 @@ export async function DragonLair() {
                 {area.dragonName}
               </h2>
               <p className="text-sm text-silver-300">
-                {area.name} · Stage {growth.stage + 1} of {STAGE_COUNT} · <span className="text-silver-100">{growth.stageName}</span>
+                {area.elementName} dragon of {area.name}
+              </p>
+              <p className="text-sm text-silver-300">
+                Stage {growth.stage + 1} of {STAGE_COUNT} · <span className="text-silver-100">{growth.stageName}</span>
               </p>
 
               <div className="mt-3">
