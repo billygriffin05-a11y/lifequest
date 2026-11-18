@@ -8,9 +8,12 @@ export const metadata: Metadata = { title: "Honour · LIFEQUEST" };
 export default function HonourPage() {
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
-      <nav aria-label="Breadcrumb" className="text-sm">
+      <nav aria-label="Breadcrumb" className="flex flex-wrap gap-x-6 text-sm">
         <Link href="/" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← LIFEQUEST
+        </Link>
+        <Link href="/dragons" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
+          Dragon Lair
         </Link>
       </nav>
       <header className="mb-6">

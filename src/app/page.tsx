@@ -19,6 +19,12 @@ export default function Home() {
         >
           Open your Honour ledger
         </Link>
+        <Link
+          href="/dragons"
+          className="mt-3 ml-3 inline-flex min-h-11 items-center rounded-lg border border-emerald-500/50 px-6 font-semibold text-emerald-300 hover:bg-emerald-700/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+        >
+          Visit the Dragon Lair
+        </Link>
         <p className="mt-8 text-sm text-silver-500">
           Server status: <a className="text-emerald-300 underline underline-offset-4 hover:text-emerald-400" href="/api/health">/api/health</a>
         </p>
