@@ -9,7 +9,16 @@
  *  - Every ledger write records an AuditEvent (ids only, no free text).
  */
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
-import { deltasFor, londonDateKey, reversalOf, summarise, type HonourSummary } from "../rules";
+import {
+  buildDailySeries,
+  deltasFor,
+  lastNDateKeys,
+  londonDateKey,
+  reversalOf,
+  summarise,
+  type DailyPoint,
+  type HonourSummary,
+} from "../rules";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
 import { STARTER_ACTIONS } from "../starter-actions";
 
@@ -189,6 +198,23 @@ export async function getSummary(db: Db, now = new Date()): Promise<HonourSummar
     select: { kind: true, occurredOn: true, honourDelta: true, xpDelta: true },
   });
   return summarise(rows, londonDateKey(now));
+}
+
+export const TREND_RANGES = [7, 30, 90] as const;
+export type TrendRange = (typeof TREND_RANGES)[number];
+
+/** Daily good and bad points for the last `days` days (Europe/London), oldest first. */
+export async function getDailyTrend(db: Db, days: TrendRange, now = new Date()): Promise<DailyPoint[]> {
+  const keys = lastNDateKeys(londonDateKey(now), days);
+  const rows = await db.pointEntry.groupBy({
+    by: ["occurredOn", "kind"],
+    where: { occurredOn: { gte: keys[0], lte: keys[keys.length - 1] } },
+    _sum: { honourDelta: true },
+  });
+  return buildDailySeries(
+    rows.map((r) => ({ occurredOn: r.occurredOn, kind: r.kind, honourDelta: r._sum.honourDelta ?? 0 })),
+    keys,
+  );
 }
 
 export interface CategoryTotals {

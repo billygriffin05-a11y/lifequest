@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   addStarterActions,
   createAction,
+  getDailyTrend,
   getSummary,
   getTodayEntries,
   listActions,
@@ -95,6 +96,18 @@ describe("honour service", () => {
     const undos = await db.auditEvent.count({ where: { action: "honour.undo" } });
     expect(logs).toBe(4);
     expect(undos).toBe(1);
+  });
+
+  it("daily trend returns one good and one bad value per day for the range", async () => {
+    const trend = await getDailyTrend(db, 7, NOW);
+    expect(trend).toHaveLength(7);
+    expect(trend[6].date).toBe("2026-11-18");
+    // Today's values must equal the ledger's net good / bad for that day (undos included).
+    const today = trend[6];
+    const fromLedger = await db.pointEntry.findMany({ where: { occurredOn: "2026-11-18" } });
+    expect(today.good).toBe(fromLedger.filter((e) => e.kind === "good").reduce((n, e) => n + e.honourDelta, 0));
+    expect(today.bad).toBe(-fromLedger.filter((e) => e.kind === "bad").reduce((n, e) => n + e.honourDelta, 0));
+    expect(trend.slice(0, 6).every((d) => d.good === 0 && d.bad === 0)).toBe(true);
   });
 
   it("entries are counted on the Europe/London day", async () => {
