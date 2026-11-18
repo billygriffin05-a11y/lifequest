@@ -18,9 +18,12 @@ The iPhone is a synchronised replica. Cloud services must never silently become 
 
 Environment setup is complete. Built so far:
 - **Honour** (`src/features/honour`, `/honour`): customisable good/bad actions, append-only Honour/XP ledger with undo.
-- **Dragons** (`src/features/dragons`, `/dragons`, `/dragons/gallery`): one dragon per life area, 10 stages from that
-  area's XP, mood from the area's last-7-days Honour. Art is **procedural pixel art in code** (`sprite.ts`) — Codex image
-  generation was not available on the owner's account. Keep this approach unless the owner asks otherwise.
+- **Honour chart**: good vs bad daily line chart (7/30/90 days) on `/honour`.
+- **Dragons** (`src/features/dragons`, `/dragons`, `/dragons/gallery`): one **elemental** dragon per life area (Fire,
+  Earth, Lightning, Plasma, Water, Ice, Air, Shadow), **20 stages** from that area's XP, mood from the area's
+  last-7-days Honour. Medieval look; each element has its own breath attack. Art is **procedural pixel art in code**
+  (`sprite.ts`, layered + CSS-animated, off under reduced motion) — Codex image generation was not available on the
+  owner's account. Keep this approach unless the owner asks otherwise.
 
 Do not start other domains (finance, fitness, nutrition, etc.) unless the user has started that phase.
 
