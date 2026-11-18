@@ -3,12 +3,12 @@ import { after } from "next/server";
 import { getDataPaths } from "@/server/config/paths";
 import { prisma } from "@/server/db/client";
 import type { DeedForCalendar } from "../events";
-import { googleConfig } from "../google/config";
+import { loadGoogleConfig } from "../google/client-file";
 import { enqueueCreate, enqueueDelete, processOutbox, type CalendarDeps } from "./service";
 
 /** Production dependencies (real DB, real data dir, real fetch). */
 export function calendarDeps(): CalendarDeps {
-  return { db: prisma, paths: getDataPaths(), cfg: googleConfig(), fetchImpl: fetch };
+  return { db: prisma, paths: getDataPaths(), cfg: loadGoogleConfig(getDataPaths()), fetchImpl: fetch };
 }
 
 function syncInBackground() {
