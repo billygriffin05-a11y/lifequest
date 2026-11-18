@@ -16,8 +16,13 @@ The iPhone is a synchronised replica. Cloud services must never silently become 
 
 ## 2. Current phase
 
-**Environment setup is complete; application features have NOT been built yet.** Do not build dashboards, finance, dragons,
-fitness, etc. unless the user has started that phase. The home page is a placeholder.
+Environment setup is complete. Built so far:
+- **Honour** (`src/features/honour`, `/honour`): customisable good/bad actions, append-only Honour/XP ledger with undo.
+- **Dragons** (`src/features/dragons`, `/dragons`, `/dragons/gallery`): one dragon per life area, 10 stages from that
+  area's XP, mood from the area's last-7-days Honour. Art is **procedural pixel art in code** (`sprite.ts`) — Codex image
+  generation was not available on the owner's account. Keep this approach unless the owner asks otherwise.
+
+Do not start other domains (finance, fitness, nutrition, etc.) unless the user has started that phase.
 
 ## 3. Stack
 

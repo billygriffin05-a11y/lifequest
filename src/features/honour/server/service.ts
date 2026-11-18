@@ -107,6 +107,7 @@ export async function logAction(db: Db, input: { actionId: string; idempotencyKe
           kind: action.kind,
           actionName: action.name,
           actionIcon: action.icon,
+          actionCategory: action.category,
           ...deltas,
           occurredOn: londonDateKey(now),
           occurredAt: now,
@@ -150,6 +151,7 @@ export async function undoEntry(db: Db, input: { entryId: string; idempotencyKey
           kind: original.kind,
           actionName: original.actionName,
           actionIcon: original.actionIcon,
+          actionCategory: original.actionCategory,
           ...reversalOf(original),
           // Counted against the same day as the entry it cancels.
           occurredOn: original.occurredOn,
@@ -187,6 +189,40 @@ export async function getSummary(db: Db, now = new Date()): Promise<HonourSummar
     select: { kind: true, occurredOn: true, honourDelta: true, xpDelta: true },
   });
   return summarise(rows, londonDateKey(now));
+}
+
+export interface CategoryTotals {
+  category: string;
+  /** All-time XP from this category (reversals included). */
+  xp: number;
+  /** Net Honour since `sinceDateKey` (inclusive). */
+  recentHonour: number;
+  /** Ledger rows since `sinceDateKey` (originals + reversals). */
+  recentEntries: number;
+}
+
+/** Per-category XP and recent Honour — the public read model other features (dragons) use. */
+export async function getCategoryTotals(db: Db, sinceDateKey: string): Promise<CategoryTotals[]> {
+  const [allTime, recent] = await Promise.all([
+    db.pointEntry.groupBy({ by: ["actionCategory"], _sum: { xpDelta: true } }),
+    db.pointEntry.groupBy({
+      by: ["actionCategory"],
+      where: { occurredOn: { gte: sinceDateKey } },
+      _sum: { honourDelta: true },
+      _count: { _all: true },
+    }),
+  ]);
+  const byCat = new Map<string, CategoryTotals>();
+  for (const r of allTime) {
+    byCat.set(r.actionCategory, { category: r.actionCategory, xp: r._sum.xpDelta ?? 0, recentHonour: 0, recentEntries: 0 });
+  }
+  for (const r of recent) {
+    const row = byCat.get(r.actionCategory) ?? { category: r.actionCategory, xp: 0, recentHonour: 0, recentEntries: 0 };
+    row.recentHonour = r._sum.honourDelta ?? 0;
+    row.recentEntries = r._count._all;
+    byCat.set(r.actionCategory, row);
+  }
+  return [...byCat.values()];
 }
 
 export interface TodayEntry {

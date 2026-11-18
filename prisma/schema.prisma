@@ -83,6 +83,8 @@ model PointEntry {
   kind            String
   actionName      String
   actionIcon      String
+  /// Category at the time of logging — decides which area dragon gets the XP.
+  actionCategory  String      @default("Other")
   /// Signed change to the Honour score.
   honourDelta     Int
   /// Change to XP (good actions only; negative only when reversing a good entry).
@@ -99,4 +101,5 @@ model PointEntry {
 
   @@index([occurredOn])
   @@index([actionId])
+  @@index([actionCategory])
 }

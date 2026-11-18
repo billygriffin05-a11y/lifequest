@@ -41,6 +41,20 @@
   color-scheme: dark;
 }
 
+/* Joyful dragons hop; disabled automatically by the reduced-motion rule below. */
+@keyframes lq-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6%);
+  }
+}
+.lq-hop {
+  animation: lq-hop 1.6s ease-in-out infinite;
+}
+
 body {
   background-color: var(--color-obsidian-950);
   color: var(--color-silver-100);
