@@ -4,12 +4,14 @@
  * created once, deeds sync idempotently, failures retry, and unlink revokes.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { eventIdFor } from "@/features/calendar/events";
 import type { Fetch } from "@/features/calendar/google/api";
 import { googleConfig } from "@/features/calendar/google/config";
 import {
   disconnect,
   enqueueCreate,
   enqueueDelete,
+  enqueuePatch,
   getStatus,
   MAX_ATTEMPTS,
   processOutbox,
@@ -57,6 +59,12 @@ function fakeGoogle() {
       const id = (JSON.parse(body!) as { id: string }).id;
       if (events.has(id)) return json(409, { error: "duplicate" });
       events.set(id, JSON.parse(body!));
+      return json(200, { id });
+    }
+    if (ev && method === "PATCH") {
+      const id = decodeURIComponent(ev[1]!);
+      if (!events.has(id)) return json(404, {});
+      events.set(id, { ...(events.get(id) as object), ...JSON.parse(body!) });
       return json(200, { id });
     }
     if (ev && method === "DELETE") {
@@ -116,6 +124,13 @@ describe("google calendar sync", () => {
     expect(await processOutbox(deps)).toEqual({ sent: 3, failed: 0 });
     expect(google.events.size).toBe(2);
     expect((await getStatus(db, cfg)).pending).toBe(0);
+  });
+
+  it("a note updates the event description", async () => {
+    await enqueuePatch(db, "entry-1", "good", "5k in 28 min");
+    await processOutbox(deps);
+    const ev = google.events.get(eventIdFor("entry-1")) as { description: string };
+    expect(ev.description).toBe("5k in 28 min\n\nGood deed logged in LIFEQUEST.");
   });
 
   it("undo removes the event", async () => {

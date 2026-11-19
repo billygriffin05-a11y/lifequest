@@ -5,12 +5,13 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { DataPaths } from "@/server/config/paths";
 import { decryptSecret, encryptSecret, getOrCreateKey } from "@/server/secrets/crypto";
-import { eventBodyFor, eventIdFor, type DeedForCalendar } from "../events";
+import { eventBodyFor, eventDescriptionFor, eventIdFor, type DeedForCalendar } from "../events";
 import {
   createLifequestCalendar,
   deleteEvent,
   GoogleApiError,
   insertEvent,
+  patchEvent,
   refreshAccessToken,
   revokeToken,
   type Fetch,
@@ -129,6 +130,15 @@ export async function enqueueCreate(db: PrismaClient, deed: DeedForCalendar): Pr
   return true;
 }
 
+/** Queue a description update after the owner adds/edits a note (no-op when not connected). */
+export async function enqueuePatch(db: PrismaClient, entryId: string, kind: string, note: string | null): Promise<boolean> {
+  if (!(await isConnected(db))) return false;
+  await db.calendarOutbox.create({
+    data: { op: "patch", eventId: eventIdFor(entryId), payload: JSON.stringify({ description: eventDescriptionFor(kind, note) }) },
+  });
+  return true;
+}
+
 /** Queue removal of the event for an undone deed (no-op when not connected). */
 export async function enqueueDelete(db: PrismaClient, entryId: string): Promise<boolean> {
   if (!(await isConnected(db))) return false;
@@ -172,6 +182,7 @@ export async function processOutbox(deps: CalendarDeps, limit = 25): Promise<Syn
   for (const item of items) {
     try {
       if (item.op === "create" && item.payload) await insertEvent(deps.fetchImpl, token, calendarId, JSON.parse(item.payload));
+      else if (item.op === "patch" && item.payload) await patchEvent(deps.fetchImpl, token, calendarId, item.eventId, JSON.parse(item.payload));
       else if (item.op === "delete") await deleteEvent(deps.fetchImpl, token, calendarId, item.eventId);
       await deps.db.calendarOutbox.update({ where: { id: item.id }, data: { doneAt: new Date(), lastError: null } });
       sent++;

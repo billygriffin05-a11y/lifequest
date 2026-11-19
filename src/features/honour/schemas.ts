@@ -44,3 +44,16 @@ export const idempotencyKeySchema = z.uuid();
 
 export const logInputSchema = z.object({ actionId: idSchema, idempotencyKey: idempotencyKeySchema }).strict();
 export const undoInputSchema = z.object({ entryId: idSchema, idempotencyKey: idempotencyKeySchema }).strict();
+
+export const MAX_NOTE = 140;
+/** Empty note clears it. */
+export const noteInputSchema = z
+  .object({
+    entryId: idSchema,
+    note: z
+      .string()
+      .trim()
+      .max(MAX_NOTE, `Notes must be ${MAX_NOTE} characters or fewer`)
+      .transform((s) => (s.length ? s : null)),
+  })
+  .strict();

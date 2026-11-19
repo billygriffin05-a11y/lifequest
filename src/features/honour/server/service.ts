@@ -19,6 +19,7 @@ import {
   type DailyPoint,
   type HonourSummary,
 } from "../rules";
+import { rankForXp, streaksByAction, type Rank } from "../progress";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
 import { STARTER_ACTIONS } from "../starter-actions";
 
@@ -277,6 +278,57 @@ export async function getCategoryTotals(db: Db, sinceDateKey: string): Promise<C
   return [...byCat.values()];
 }
 
+// ── Notes ────────────────────────────────────────────────────────────────────
+
+/** Set or clear the owner's note on a logged deed (not on undo rows). Scoring is unaffected. */
+export async function setEntryNote(db: Db, entryId: string, note: string | null) {
+  const entry = await db.pointEntry.findUnique({ where: { id: entryId } });
+  if (!entry) throw new HonourError("Entry not found", "NOT_FOUND");
+  if (entry.reversesEntryId) throw new HonourError("Notes can't be added to an undo", "NOT_REVERSIBLE");
+  const updated = await db.pointEntry.update({ where: { id: entryId }, data: { note } });
+  await db.auditEvent.create({ data: { actor: DEVICE, action: "honour.note", entityType: "PointEntry", entityId: entryId } });
+  return updated;
+}
+
+// ── Streaks, bonus XP and rank (all derived from the ledger) ─────────────────
+
+async function ledgerFacts(db: Db) {
+  return db.pointEntry.findMany({
+    select: { id: true, actionId: true, actionCategory: true, kind: true, occurredOn: true, reversesEntryId: true, xpDelta: true },
+  });
+}
+
+export interface PlayerProgress {
+  baseXp: number;
+  bonusXp: number;
+  totalXp: number;
+  rank: Rank;
+  /** Current streak (days) per action id. */
+  streaks: Record<string, number>;
+}
+
+export async function getPlayerProgress(db: Db, now = new Date()): Promise<PlayerProgress> {
+  const rows = await ledgerFacts(db);
+  const baseXp = rows.reduce((n, r) => n + r.xpDelta, 0);
+  const streakMap = streaksByAction(rows, londonDateKey(now));
+  let bonusXp = 0;
+  const streaks: Record<string, number> = {};
+  for (const [actionId, s] of streakMap) {
+    bonusXp += s.bonusXp;
+    streaks[actionId] = s.current;
+  }
+  return { baseXp, bonusXp, totalXp: baseXp + bonusXp, rank: rankForXp(baseXp + bonusXp), streaks };
+}
+
+/** Streak bonus XP per action category (feeds each area's dragon). */
+export async function getStreakBonusByCategory(db: Db, now = new Date()): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const s of streaksByAction(await ledgerFacts(db), londonDateKey(now)).values()) {
+    out.set(s.category, (out.get(s.category) ?? 0) + s.bonusXp);
+  }
+  return out;
+}
+
 export interface TodayEntry {
   id: string;
   name: string;
@@ -285,6 +337,7 @@ export interface TodayEntry {
   honourDelta: number;
   occurredAt: Date;
   undone: boolean;
+  note: string | null;
 }
 
 /** Today's original entries (not reversal rows), newest first, flagged if undone. */
@@ -303,6 +356,7 @@ export async function getTodayEntries(db: Db, now = new Date()): Promise<TodayEn
       kind: r.kind,
       honourDelta: r.honourDelta,
       occurredAt: r.occurredAt,
+      note: r.note,
       undone: reversed.has(r.id),
     }));
 }

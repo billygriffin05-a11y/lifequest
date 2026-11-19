@@ -12,9 +12,11 @@ interface Props {
   category: string;
   /** Already logged today (one per day). */
   doneToday?: boolean;
+  /** Current streak in days (good actions). */
+  streak?: number;
 }
 
-export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false }: Props) {
+export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false, streak = 0 }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const good = kind === "good";
@@ -47,7 +49,14 @@ export function LogButton({ actionId, name, icon, points, kind, category, doneTo
         </span>
         <span className="flex-1">
           <span className="block font-medium text-silver-100">{name}</span>
-          <span className="block text-xs text-silver-300">{category}</span>
+          <span className="block text-xs text-silver-300">
+            {category}
+            {streak >= 2 && (
+              <span className="ml-2 font-semibold text-gold-300" data-testid="streak">
+                🔥 {streak}-day streak
+              </span>
+            )}
+          </span>
         </span>
         {doneToday ? (
           <span className="text-sm font-semibold text-silver-300">✓ Done today</span>
