@@ -22,6 +22,8 @@ test("weekly boss shows on the Honour page", async ({ page }) => {
 test("home shows a hero dragon with gold, and a dragon can be made favourite", async ({ page }) => {
   await page.goto("/dragons/reading");
   const fav = page.getByRole("button", { name: "☆ Make favourite" });
+  // The page streams in: wait for either state before deciding.
+  await expect(fav.or(page.getByText("★ Your favourite dragon"))).toBeVisible();
   if (await fav.count()) await fav.click();
   await expect(page.getByText("★ Your favourite dragon")).toBeVisible();
   await page.goto("/");
