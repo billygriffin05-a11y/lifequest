@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildAuthUrl, randomToken } from "@/features/calendar/google/api";
-import { googleConfig } from "@/features/calendar/google/config";
+import { loadGoogleConfig } from "@/features/calendar/google/client-file";
+import { getDataPaths } from "@/server/config/paths";
 
 const COOKIE_PATH = "/api/integrations/google";
 
 /** Starts Google OAuth (authorization code + PKCE + state). */
 export async function GET(request: NextRequest) {
-  const cfg = googleConfig();
+  const cfg = loadGoogleConfig(getDataPaths());
   if (!cfg) return NextResponse.redirect(new URL("/settings?google=not-configured", request.url));
 
   // The OAuth cookies must live on the same origin as the registered redirect

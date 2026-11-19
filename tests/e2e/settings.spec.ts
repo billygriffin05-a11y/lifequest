@@ -14,7 +14,8 @@ test("settings shows Google Calendar setup steps when no OAuth client is configu
 test("starting OAuth without configuration goes back to settings (never to Google)", async ({ page }) => {
   await page.goto("/api/integrations/google/start");
   await expect(page).toHaveURL(/\/settings\?google=not-configured$/);
-  await expect(page.getByRole("status")).toContainText("Add your Google OAuth client");
+  await expect(page.getByRole("status")).toContainText("Import your Google OAuth client file");
+  await expect(page.getByRole("button", { name: "Import from Downloads" })).toBeVisible();
 });
 
 test("a forged callback is rejected", async ({ request }) => {

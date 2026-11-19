@@ -43,12 +43,12 @@ setInterval(runAutoBackup, 60 * 60 * 1000).unref();
 // Lazy imports: only touches Prisma/Google when the owner has set it up.
 async function runCalendarSync() {
   try {
-    const [{ googleConfig }, { processOutbox }, { createPrismaClient }] = await Promise.all([
-      import("@/features/calendar/google/config"),
+    const [{ loadGoogleConfig }, { processOutbox }, { createPrismaClient }] = await Promise.all([
+      import("@/features/calendar/google/client-file"),
       import("@/features/calendar/server/service"),
       import("./db/factory"),
     ]);
-    const cfg = googleConfig();
+    const cfg = loadGoogleConfig(paths);
     if (!cfg) return;
     const db = createPrismaClient(paths.dbFile);
     try {
