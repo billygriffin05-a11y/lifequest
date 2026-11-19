@@ -220,3 +220,55 @@ model SavingsDeposit {
 
   @@index([goalId])
 }
+
+// ── Body (health data: stays on this PC, never logged) ──────────────────────
+
+/// One exercise entry in a workout. Weight in grams (int) to avoid floats.
+model WorkoutSet {
+  id          String    @id @default(cuid())
+  occurredOn  String
+  exercise    String
+  sets        Int
+  reps        Int
+  weightGrams Int       @default(0)
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  @@index([occurredOn])
+  @@index([exercise])
+}
+
+/// One run. Distance in metres, time in seconds.
+model RunLog {
+  id              String    @id @default(cuid())
+  occurredOn      String
+  distanceMetres  Int
+  durationSeconds Int
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  @@index([occurredOn])
+}
+
+/// Glasses of water drunk on a day (one row per day).
+model WaterDay {
+  day       String   @id
+  glasses   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+/// A night's sleep, keyed by the day you woke up. Times are "HH:MM" local.
+model SleepLog {
+  day       String   @id
+  bedTime   String
+  wakeTime  String
+  minutes   Int
+  updatedAt DateTime @updatedAt
+}
+
+/// Body weight for a day, in grams.
+model WeightLog {
+  day       String   @id
+  grams     Int
+  updatedAt DateTime @updatedAt
+}

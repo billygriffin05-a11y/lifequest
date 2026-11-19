@@ -32,6 +32,7 @@ import {
   type BossBattle,
   type Rank,
 } from "../progress";
+import { getBodyRewards } from "@/features/body/server/service";
 import { getBudgetRewardMonths } from "@/features/finance/server/service";
 import { BUDGET_REWARD_XP } from "@/features/finance/money";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
@@ -378,11 +379,12 @@ async function questCandidates(db: Db) {
 /** All bonus XP by category: streaks, weekly targets and completed daily quests. */
 async function bonusByCategory(db: Db, now: Date) {
   const today = londonDateKey(now);
-  const [rows, targets, candidates, budgetMonths] = await Promise.all([
+  const [rows, targets, candidates, budgetMonths, bodyRewards] = await Promise.all([
     ledgerFacts(db),
     weeklyTargets(db),
     questCandidates(db),
     getBudgetRewardMonths(db, today.slice(0, 7)),
+    getBodyRewards(db),
   ]);
   const streakMap = streaksByAction(rows, today, targets);
   const byCategory = new Map<string, number>();
@@ -392,6 +394,8 @@ async function bonusByCategory(db: Db, now: Date) {
   }
   // Months kept within budget grow the Finance dragon.
   if (budgetMonths.length) byCategory.set("Finance", (byCategory.get("Finance") ?? 0) + budgetMonths.length * BUDGET_REWARD_XP);
+  // Workouts, runs, water and sleep grow the Fitness, Nutrition and Sleep dragons.
+  for (const [c, b] of bodyRewards) byCategory.set(c, (byCategory.get(c) ?? 0) + b);
   return { rows, targets, candidates, streakMap, byCategory, today };
 }
 
