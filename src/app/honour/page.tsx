@@ -18,6 +18,9 @@ export default function HonourPage({ searchParams }: PageProps<"/honour">) {
         <Link href="/settings" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           Google Calendar
         </Link>
+        <Link href="/achievements" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
+          Achievements
+        </Link>
       </nav>
       <header className="mb-6">
         <h1 className="font-display text-4xl font-bold tracking-wide text-gold-300">Honour</h1>

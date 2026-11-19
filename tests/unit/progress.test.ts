@@ -5,6 +5,10 @@ import {
   rankForXp,
   RANKS,
   runLengths,
+  daysPerWeek,
+  weekStart,
+  weeklyBonus,
+  WEEKLY_TARGET_BONUS,
   streaksByAction,
   type LedgerFact,
 } from "@/features/honour/progress";
@@ -48,12 +52,12 @@ describe("streaks", () => {
     }
     rows.push({ id: "b1", actionId: "takeaway", actionCategory: "Nutrition", kind: "bad", occurredOn: "2026-11-07", reversesEntryId: null });
     let s = streaksByAction(rows, "2026-11-07");
-    expect(s.get("gym")).toEqual({ current: 7, bonusXp: 25, category: "Fitness" });
+    expect(s.get("gym")).toMatchObject({ current: 7, best: 7, bonusXp: 25, category: "Fitness" });
     expect(s.has("takeaway")).toBe(false);
     // Undo day 4 → two runs of 3, no bonus.
     rows.push({ id: "r4", actionId: "gym", actionCategory: "Fitness", kind: "good", occurredOn: "2026-11-04", reversesEntryId: "g4" });
     s = streaksByAction(rows, "2026-11-07");
-    expect(s.get("gym")).toEqual({ current: 3, bonusXp: 0, category: "Fitness" });
+    expect(s.get("gym")).toMatchObject({ current: 3, best: 3, bonusXp: 0, category: "Fitness" });
   });
 });
 
@@ -68,5 +72,29 @@ describe("player rank", () => {
     expect(rankForXp(250)).toMatchObject({ title: "Squire", level: 2, percent: 50 });
     expect(rankForXp(10_000)).toMatchObject({ title: "Legend", nextAt: null, percent: 100 });
     expect(rankForXp(-5).title).toBe("Peasant");
+  });
+});
+
+describe("weekly targets", () => {
+  it("weeks start on Monday", () => {
+    expect(weekStart("2026-11-19")).toBe("2026-11-16"); // Thursday → Monday
+    expect(weekStart("2026-11-16")).toBe("2026-11-16");
+    expect(weekStart("2026-11-22")).toBe("2026-11-16"); // Sunday belongs to the same week
+  });
+
+  it("counts done-days per week and pays +15 for each week the target is met", () => {
+    const d = days("2026-11-16", "2026-11-18", "2026-11-20", "2026-11-23");
+    expect(daysPerWeek(d)).toEqual(new Map([["2026-11-16", 3], ["2026-11-23", 1]]));
+    expect(weeklyBonus(d, 3)).toEqual({ weeksMet: 1, bonusXp: WEEKLY_TARGET_BONUS });
+    expect(weeklyBonus(d, 4)).toEqual({ weeksMet: 0, bonusXp: 0 });
+    expect(weeklyBonus(d, null)).toEqual({ weeksMet: 0, bonusXp: 0 });
+  });
+
+  it("streak info includes this week's count and the weekly bonus", () => {
+    const rows = ["2026-11-16", "2026-11-18", "2026-11-19"].map((k, i) => ({
+      id: `e${i}`, actionId: "gym", actionCategory: "Fitness", kind: "good", occurredOn: k, reversesEntryId: null,
+    }));
+    const s = streaksByAction(rows, "2026-11-19", new Map([["gym", 3]])).get("gym")!;
+    expect(s).toMatchObject({ thisWeek: 3, weeksMet: 1, bonusXp: WEEKLY_TARGET_BONUS, current: 2, best: 2 });
   });
 });

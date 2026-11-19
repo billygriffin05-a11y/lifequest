@@ -12,9 +12,10 @@ interface Initial {
   points: number;
   icon: string;
   category: string;
+  weeklyTarget?: number | null;
 }
 
-const EMPTY: Initial = { name: "", kind: "good", points: 10, icon: "⭐", category: "Habits" };
+const EMPTY: Initial = { name: "", kind: "good", points: 10, icon: "⭐", category: "Habits", weeklyTarget: null };
 
 const input =
   "mt-1 block min-h-11 w-full rounded-lg border border-obsidian-600 bg-obsidian-950 px-3 text-silver-100 placeholder:text-silver-500 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-400";
@@ -123,7 +124,26 @@ export function ActionForm({ initial = EMPTY, mode = "create" }: { initial?: Ini
         {errorText("icon")}
       </div>
 
-      <div className="sm:col-span-2">
+      <div>
+        <label htmlFor={`${uid}-weeklyTarget`} className="text-sm text-silver-300">
+          Weekly goal (optional)
+        </label>
+        <input
+          {...field("weeklyTarget")}
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={7}
+          step={1}
+          placeholder="e.g. 3 times a week"
+          className={input}
+          defaultValue={v?.weeklyTarget ?? (initial.weeklyTarget ? String(initial.weeklyTarget) : "")}
+        />
+        <p className="mt-1 text-xs text-silver-300">Good actions only. +15 XP for every week you hit it.</p>
+        {errorText("weeklyTarget")}
+      </div>
+
+      <div>
         <label htmlFor={`${uid}-category`} className="text-sm text-silver-300">
           Category
         </label>

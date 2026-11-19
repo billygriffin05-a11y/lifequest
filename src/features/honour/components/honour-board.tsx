@@ -149,7 +149,7 @@ export async function HonourBoard({
               <ul className="mt-4 grid gap-3">
                 {good.map((a) => (
                   <li key={a.id}>
-                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="good" category={a.category} doneToday={doneToday.has(a.id)} streak={progress.streaks[a.id] ?? 0} />
+                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="good" category={a.category} doneToday={doneToday.has(a.id)} streak={progress.streaks[a.id] ?? 0} weekly={progress.weekly[a.id]} />
                   </li>
                 ))}
               </ul>
@@ -258,6 +258,7 @@ export async function HonourBoard({
                         points: a.points,
                         icon: a.icon,
                         category: a.category,
+                        weeklyTarget: a.weeklyTarget,
                       }}
                     />
                   </div>

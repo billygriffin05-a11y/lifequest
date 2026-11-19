@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { prisma } from "@/server/db/client";
 import { MOOD_HINT, MOOD_TEXT, STAGE_COUNT } from "../rules";
@@ -19,7 +20,7 @@ export async function DragonLair() {
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Your dragons">
-      {dragons.map(({ area, growth, mood, recentHonour }) => {
+      {dragons.map(({ area, displayName, growth, mood, recentHonour }) => {
         const style = moodStyle[mood];
         const headingId = `dragon-${area.id}`;
         return (
@@ -41,12 +42,14 @@ export async function DragonLair() {
                   mood={mood}
                   element={area.element}
                   palette={area.palette}
-                  label={`${area.dragonName}, the ${area.elementName} dragon of ${area.name}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
+                  label={`${displayName}, the ${area.elementName} dragon of ${area.name}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
                   className={`h-full w-full ${style.sprite}`}
                 />
               </div>
               <h2 id={headingId} className="mt-3 font-display text-lg font-bold text-gold-300">
-                {area.dragonName}
+                <Link href={`/dragons/${area.id}`} className="underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-emerald-400">
+                  {displayName}
+                </Link>
               </h2>
               <p className="text-sm text-silver-300">
                 {area.elementName} dragon of {area.name}

@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eventIdFor } from "@/features/calendar/events";
+import { REMINDER_EVENT_ID } from "@/features/calendar/reminder";
 import type { Fetch } from "@/features/calendar/google/api";
 import { googleConfig } from "@/features/calendar/google/config";
 import {
@@ -12,6 +13,8 @@ import {
   enqueueCreate,
   enqueueDelete,
   enqueuePatch,
+  getDailyReminder,
+  setDailyReminder,
   getStatus,
   MAX_ATTEMPTS,
   processOutbox,
@@ -58,6 +61,12 @@ function fakeGoogle() {
     if (ev && method === "POST") {
       const id = (JSON.parse(body!) as { id: string }).id;
       if (events.has(id)) return json(409, { error: "duplicate" });
+      events.set(id, JSON.parse(body!));
+      return json(200, { id });
+    }
+    if (ev && method === "PUT") {
+      const id = decodeURIComponent(ev[1]!);
+      if (!events.has(id)) return json(404, {});
       events.set(id, JSON.parse(body!));
       return json(200, { id });
     }
@@ -124,6 +133,23 @@ describe("google calendar sync", () => {
     expect(await processOutbox(deps)).toEqual({ sent: 3, failed: 0 });
     expect(google.events.size).toBe(2);
     expect((await getStatus(db, cfg)).pending).toBe(0);
+  });
+
+  it("turns the daily reminder on and off as one recurring event", async () => {
+    await setDailyReminder(db, { enabled: true, time: "20:00" }, "2026-11-19");
+    await processOutbox(deps);
+    const ev = google.events.get(REMINDER_EVENT_ID) as { recurrence: string[] };
+    expect(ev.recurrence).toEqual(["RRULE:FREQ=DAILY"]);
+    expect(await getDailyReminder(db)).toEqual({ enabled: true, time: "20:00" });
+    await setDailyReminder(db, { enabled: false, time: "20:00" }, "2026-11-19");
+    await processOutbox(deps);
+    expect(google.events.has(REMINDER_EVENT_ID)).toBe(false);
+    await setDailyReminder(db, { enabled: true, time: "07:30" }, "2026-11-19");
+    await processOutbox(deps);
+    expect((google.events.get(REMINDER_EVENT_ID) as { start: { dateTime: string } }).start.dateTime).toBe("2026-11-19T07:30:00");
+    // leave it off so later tests count only deed events
+    await setDailyReminder(db, { enabled: false, time: "07:30" }, "2026-11-19");
+    await processOutbox(deps);
   });
 
   it("a note updates the event description", async () => {
