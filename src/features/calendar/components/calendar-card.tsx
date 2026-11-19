@@ -1,7 +1,13 @@
 import { connection } from "next/server";
 import { prisma } from "@/server/db/client";
-import { googleConfig } from "../google/config";
-import { disconnectCalendarAction, syncCalendarNowAction } from "../server/actions";
+import { getDataPaths } from "@/server/config/paths";
+import { loadGoogleConfig } from "../google/client-file";
+import {
+  disconnectCalendarAction,
+  importClientFromDownloadsAction,
+  importClientUploadAction,
+  syncCalendarNowAction,
+} from "../server/actions";
 import { getStatus } from "../server/service";
 
 const MESSAGES: Record<string, { text: string; ok: boolean }> = {
@@ -9,7 +15,11 @@ const MESSAGES: Record<string, { text: string; ok: boolean }> = {
   denied: { text: "Google access was not granted. Nothing was linked.", ok: false },
   "invalid-state": { text: "That sign-in link expired or was tampered with. Please try again.", ok: false },
   error: { text: "Linking failed. Check your Google OAuth client settings and try again.", ok: false },
-  "not-configured": { text: "Add your Google OAuth client to .env.local first (steps below).", ok: false },
+  "not-configured": { text: "Import your Google OAuth client file first (below).", ok: false },
+  "client-imported": { text: "Google client imported. Now click “Link Google Calendar”.", ok: true },
+  "client-not-found": { text: "No client_secret_….json file found in your Downloads folder.", ok: false },
+  "client-invalid": { text: "That file isn't a Google “Web application” OAuth client JSON.", ok: false },
+  "client-too-large": { text: "That file is too large to be a Google client JSON.", ok: false },
 };
 
 const btn =
@@ -19,7 +29,7 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
   await connection();
   const sp = await searchParams;
   const flag = typeof sp.google === "string" ? MESSAGES[sp.google] : undefined;
-  const cfg = googleConfig();
+  const cfg = loadGoogleConfig(getDataPaths());
   const status = await getStatus(prisma, cfg);
 
   return (
@@ -88,7 +98,32 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
       </div>
 
       {!status.configured && (
-        <details className="mt-4 text-sm text-silver-300" open>
+        <div className="mt-4 rounded-xl border border-gold-500/30 p-4 text-sm">
+          <p className="text-silver-100">Import the Google client file (no copy-pasting secrets):</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <form action={importClientFromDownloadsAction}>
+              <button type="submit" className={`${btn} bg-gold-500 text-obsidian-950 hover:bg-gold-400`}>
+                Import from Downloads
+              </button>
+            </form>
+            <form action={importClientUploadAction} className="flex flex-wrap items-center gap-2">
+              <label htmlFor="gcal-client-file" className="text-silver-300">
+                or choose the file
+              </label>
+              <input id="gcal-client-file" name="client" type="file" accept=".json,application/json" className="max-w-56 text-silver-300" />
+              <button type="submit" className={`${btn} border border-gold-500/50 text-gold-300 hover:bg-gold-500/10`}>
+                Upload
+              </button>
+            </form>
+          </div>
+          <p className="mt-2 text-xs text-silver-300">
+            The secret is stored privately in your LIFEQUEST data folder and the download is deleted.
+          </p>
+        </div>
+      )}
+
+      {!status.configured && (
+        <details className="mt-4 text-sm text-silver-300">
           <summary className="min-h-11 cursor-pointer py-2 text-emerald-300">One-time setup (about 5 minutes)</summary>
           <ol className="list-decimal space-y-1 pl-5">
             <li>
@@ -121,8 +156,8 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
               <code className="break-all text-silver-100">{cfg?.redirectUri ?? "http://localhost:3000/api/integrations/google/callback"}</code>.
             </li>
             <li>
-              Put the client ID and secret in <code>.env.local</code> in the project folder as <code>GOOGLE_CLIENT_ID=…</code> and{" "}
-              <code>GOOGLE_CLIENT_SECRET=…</code>, then restart LIFEQUEST.
+              Click <em>Download JSON</em> on the new client, then <em>Import from Downloads</em> above. (Advanced: you can
+              instead set <code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code> in <code>.env.local</code>.)
             </li>
           </ol>
         </details>

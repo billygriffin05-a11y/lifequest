@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { exchangeCode } from "@/features/calendar/google/api";
-import { googleConfig } from "@/features/calendar/google/config";
+import { loadGoogleConfig } from "@/features/calendar/google/client-file";
+import { getDataPaths } from "@/server/config/paths";
 import { calendarDeps } from "@/features/calendar/server/runtime";
 import { saveConnection } from "@/features/calendar/server/service";
 
@@ -22,7 +23,7 @@ function done(request: NextRequest, result: "connected" | "denied" | "invalid-st
 }
 
 export async function GET(request: NextRequest) {
-  const cfg = googleConfig();
+  const cfg = loadGoogleConfig(getDataPaths());
   if (!cfg) return NextResponse.redirect(new URL("/settings?google=not-configured", request.url));
 
   const params = request.nextUrl.searchParams;
