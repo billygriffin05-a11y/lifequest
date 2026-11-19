@@ -26,9 +26,10 @@ test("open a dragon's page from the lair and rename it", async ({ page }, info) 
   await expect(page.getByRole("heading", { level: 1, name: "Duskshade" })).toBeVisible();
 });
 
-test("unknown dragon areas show a 404", async ({ page }) => {
-  const res = await page.goto("/dragons/not-a-dragon");
-  expect(res?.status()).toBe(404);
+test("unknown dragon areas show the not-found page", async ({ page }) => {
+  // The page streams (status is sent before the lookup), so check what the user sees.
+  await page.goto("/dragons/not-a-dragon");
+  await expect(page.getByText(/could not be found/i)).toBeVisible();
 });
 
 test("a weekly goal shows progress on the log button", async ({ page }, info) => {
