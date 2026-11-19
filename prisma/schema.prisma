@@ -272,3 +272,79 @@ model WeightLog {
   grams     Int
   updatedAt DateTime @updatedAt
 }
+
+// ── Mind (reading, study, reflection: private, never logged) ────────────────
+
+model Book {
+  id         String       @id @default(cuid())
+  title      String
+  author     String       @default("")
+  totalPages Int
+  /// Set when pages read reaches totalPages.
+  finishedOn String?
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  logs       ReadingLog[]
+}
+
+/// Pages read in one sitting. Append-only; a book's progress is the sum.
+model ReadingLog {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  day       String
+  pages     Int
+  createdAt DateTime @default(now())
+
+  @@index([bookId])
+  @@index([day])
+}
+
+/// Spaced-repetition card (Leitner boxes 1-5).
+model Flashcard {
+  id         String       @id @default(cuid())
+  deck       String       @default("Security+")
+  topic      String       @default("")
+  front      String
+  back       String
+  box        Int          @default(1)
+  dueOn      String
+  /// Stable key for starter cards so re-seeding never duplicates.
+  seedKey    String?      @unique
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  reviews    CardReview[]
+
+  @@index([dueOn])
+}
+
+model CardReview {
+  id        String    @id @default(cuid())
+  cardId    String
+  card      Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  day       String
+  correct   Boolean
+  createdAt DateTime  @default(now())
+
+  @@index([day])
+}
+
+/// One per day: mood 1-5 and/or a short journal entry.
+model Reflection {
+  day       String   @id
+  mood      Int?
+  entry     String?
+  updatedAt DateTime @updatedAt
+}
+
+/// A completed focus (Pomodoro) session.
+model FocusSession {
+  id        String   @id @default(cuid())
+  day       String
+  minutes   Int
+  label     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([day])
+}

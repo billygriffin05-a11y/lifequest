@@ -31,11 +31,11 @@ Built in batches of five, each with tests and its own PR. Status: ⬜ planned ·
 20. ✅ **Body weight** trend.
 
 ## Batch 5 — Mind
-21. ⬜ **Reading tracker** — books, pages, finish dates.
-22. ⬜ **Security+ flashcards** with spaced repetition.
-23. ⬜ **Journal** — a short daily entry.
-24. ⬜ **Mood check-in** — 1–5 with trend.
-25. ⬜ **Focus timer** (Pomodoro) that logs study time.
+21. ✅ **Reading tracker** — books, pages, finish dates.
+22. ✅ **Security+ flashcards** with spaced repetition.
+23. ✅ **Journal** — a short daily entry.
+24. ✅ **Mood check-in** — 1–5 with trend.
+25. ✅ **Focus timer** (Pomodoro) that logs study time.
 
 ## Batch 6 — Polish
 26. ⬜ **Weekly report** page — wins, misses, streaks, dragons.
