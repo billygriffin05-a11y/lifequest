@@ -87,7 +87,18 @@ model DragonProfile {
   /// Area id, e.g. "fitness".
   areaId     String   @id
   customName String?
+  /// Equipped cosmetic item id from the treasure shop (see src/features/treasury/catalog.ts).
+  accessory  String?
   updatedAt  DateTime @updatedAt
+}
+
+/// Gold spent in the treasure shop. Append-only; the gold balance is derived
+/// (earned from deeds/bonuses minus purchases). One purchase per item.
+model Purchase {
+  id          String   @id @default(cuid())
+  itemId      String   @unique
+  price       Int
+  purchasedAt DateTime @default(now())
 }
 
 // ── Honour: customisable good / bad actions ─────────────────────────────────

@@ -20,7 +20,7 @@ export async function DragonLair() {
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Your dragons">
-      {dragons.map(({ area, displayName, growth, mood, recentHonour }) => {
+      {dragons.map(({ area, displayName, accessory, growth, mood, recentHonour }) => {
         const style = moodStyle[mood];
         const headingId = `dragon-${area.id}`;
         return (
@@ -42,6 +42,7 @@ export async function DragonLair() {
                   mood={mood}
                   element={area.element}
                   palette={area.palette}
+                  accessory={accessory}
                   label={`${displayName}, the ${area.elementName} dragon of ${area.name}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
                   className={`h-full w-full ${style.sprite}`}
                 />

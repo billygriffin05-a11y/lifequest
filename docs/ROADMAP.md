@@ -10,11 +10,11 @@ Built in batches of five, each with tests and its own PR. Status: ⬜ planned ·
 5. ✅ **Level-up celebration** — banner when your rank or a dragon stage goes up.
 
 ## Batch 2 — Gold & dragons
-6. ⬜ **Gold coins** earned from deeds, quests and streaks.
-7. ⬜ **Treasure shop** — spend gold on dragon cosmetics.
-8. ⬜ **Dragon cosmetics** — hats, crowns, auras, colour variants.
-9. ⬜ **Favourite dragon** shown big on the home page.
-10. ⬜ **Weekly boss battle** — beat the boss with good deeds; bad habits heal it.
+6. ✅ **Gold coins** earned from deeds, quests and streaks.
+7. ✅ **Treasure shop** — spend gold on dragon cosmetics.
+8. ✅ **Dragon cosmetics** — hats, crowns, auras, colour variants.
+9. ✅ **Favourite dragon** shown big on the home page.
+10. ✅ **Weekly boss battle** — beat the boss with good deeds; bad habits heal it.
 
 ## Batch 3 — Finance (local only, no bank login)
 11. ⬜ **Monthly budget** by category (pence-accurate).

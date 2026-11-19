@@ -7,6 +7,8 @@ import { DragonSprite } from "@/features/dragons/components/dragon-sprite";
 import { RenameForm } from "@/features/dragons/components/rename-form";
 import { MOOD_HINT, MOOD_TEXT, STAGE_COUNT } from "@/features/dragons/rules";
 import { getDragonDetail } from "@/features/dragons/server/service";
+import { equipItemAction, setFavouriteAction } from "@/features/treasury/server/actions";
+import { getFavouriteDragon } from "@/features/treasury/server/service";
 import { prisma } from "@/server/db/client";
 
 export const metadata: Metadata = { title: "Dragon · LIFEQUEST" };
@@ -18,7 +20,7 @@ const fmtDay = (key: string) => dateFmt.format(new Date(`${key}T12:00:00Z`));
 async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
   await connection();
   const { area } = await params;
-  const detail = await getDragonDetail(prisma, area);
+  const [detail, favourite] = await Promise.all([getDragonDetail(prisma, area), getFavouriteDragon(prisma)]);
   if (!detail) notFound();
   const { dragon, timeline, recent } = detail;
   const { growth, mood } = dragon;
@@ -44,6 +46,7 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
             mood={mood}
             element={dragon.area.element}
             palette={dragon.area.palette}
+            accessory={dragon.accessory}
             label={`${dragon.displayName}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
             className="aspect-[7/5] w-full"
           />
@@ -72,6 +75,31 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
           <p className="text-sm text-silver-300">{MOOD_HINT[mood]}</p>
           <div className="mt-5">
             <RenameForm areaId={dragon.area.id} current={dragon.customName} defaultName={dragon.area.dragonName} />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {favourite === dragon.area.id ? (
+              <p className="inline-flex min-h-11 items-center text-sm text-gold-300">★ Your favourite dragon</p>
+            ) : (
+              <form action={setFavouriteAction}>
+                <input type="hidden" name="areaId" value={dragon.area.id} />
+                <button type="submit" className="min-h-11 rounded-lg border border-gold-500/50 px-4 text-sm text-gold-300 hover:bg-gold-500/10">
+                  ☆ Make favourite
+                </button>
+              </form>
+            )}
+            {dragon.accessory ? (
+              <form action={equipItemAction}>
+                <input type="hidden" name="areaId" value={dragon.area.id} />
+                <input type="hidden" name="itemId" value="" />
+                <button type="submit" className="min-h-11 rounded-lg border border-silver-500/40 px-4 text-sm text-silver-300 hover:text-silver-100">
+                  Remove item
+                </button>
+              </form>
+            ) : (
+              <Link href="/shop" className="inline-flex min-h-11 items-center text-sm text-emerald-300 underline underline-offset-4">
+                Dress up in the Treasure Shop
+              </Link>
+            )}
           </div>
         </section>
       </div>

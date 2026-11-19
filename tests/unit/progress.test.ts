@@ -13,6 +13,10 @@ import {
   questBonusByCategory,
   QUEST_BONUS,
   heatmapWeeks,
+  bossBattle,
+  bossForWeek,
+  honourByWeek,
+  BOSS_HP,
   streaksByAction,
   type LedgerFact,
 } from "@/features/honour/progress";
@@ -136,5 +140,30 @@ describe("heatmap weeks", () => {
     expect(w[11][0]).toBe("2026-11-16");
     expect(w[11][6]).toBe("2026-11-22");
     expect(w[0][0]).toBe("2026-08-31");
+  });
+});
+
+describe("weekly boss", () => {
+  it("is the same boss all week and changes between weeks", () => {
+    expect(bossForWeek("2026-11-16")).toEqual(bossForWeek("2026-11-16"));
+    const names = new Set(["2026-11-02", "2026-11-09", "2026-11-16", "2026-11-23", "2026-11-30"].map((w) => bossForWeek(w).name));
+    expect(names.size).toBeGreaterThan(1);
+  });
+
+  it("good deeds damage, bad habits heal, defeat at 300 net", () => {
+    expect(bossBattle("2026-11-16", 200, 50)).toMatchObject({ hpLeft: 150, defeated: false });
+    expect(bossBattle("2026-11-16", 340, 40)).toMatchObject({ hpLeft: 0, defeated: true });
+    expect(bossBattle("2026-11-16", 10, 90)).toMatchObject({ hpLeft: BOSS_HP, defeated: false });
+  });
+
+  it("sums Honour per week with undos netted", () => {
+    const w = honourByWeek([
+      { kind: "good", occurredOn: "2026-11-17", honourDelta: 20 },
+      { kind: "good", occurredOn: "2026-11-17", honourDelta: -20 },
+      { kind: "bad", occurredOn: "2026-11-18", honourDelta: -15 },
+      { kind: "good", occurredOn: "2026-11-23", honourDelta: 10 },
+    ]);
+    expect(w.get("2026-11-16")).toEqual({ good: 0, bad: 15 });
+    expect(w.get("2026-11-23")).toEqual({ good: 10, bad: 0 });
   });
 });

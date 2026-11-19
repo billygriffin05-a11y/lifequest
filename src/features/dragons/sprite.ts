@@ -48,6 +48,8 @@ export interface SpriteLayers {
   wingOrigin: Pt | null;
   /** Pivot for the breath flicker (viewBox units). */
   mouth: Pt | null;
+  /** Top-centre of the head (or egg) — where cosmetics sit. */
+  head: Pt;
 }
 
 // ── Raster helpers ───────────────────────────────────────────────────────────
@@ -232,6 +234,7 @@ interface DragonResult {
   wingOrigin: Pt | null;
   mouth: Pt;
   eyes: Pt[];
+  head: Pt;
 }
 
 function drawWing(w: Grid, f: Frame, stage: number): Pt {
@@ -389,7 +392,12 @@ function drawDragon(g: Grid, w: Grid, stage: number, mood: Mood): DragonResult {
     }
   }
 
-  return { wingOrigin, mouth: [Math.round(snoutX + headR * 0.6), Math.round(snoutY + headR * 0.05)], eyes };
+  return {
+    wingOrigin,
+    mouth: [Math.round(snoutX + headR * 0.6), Math.round(snoutY + headR * 0.05)],
+    eyes,
+    head: [Math.round(hx), Math.round(hy - headR * 0.92 - 1)],
+  };
 }
 
 // ── Breath attacks ───────────────────────────────────────────────────────────
@@ -537,6 +545,7 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
   let eyes: Pt[] = [];
   let wingOrigin: Pt | null = null;
   let mouth: Pt | null = null;
+  let head: Pt = [28, 17];
 
   if (stage <= 0) {
     drawEgg(g, "plain");
@@ -546,6 +555,7 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
     addOutline(g);
   } else if (stage === 2) {
     const [hx, hy] = [28, 21];
+    head = [hx, Math.round(hy - 4.2 - 1)];
     ellipse(g, hx, hy, 4.6, 4.2, "body");
     ellipse(g, hx + 3.6, hy + 1.4, 2.4, 1.8, "body");
     eyes = drawEye(g, hx + 1, hy - 1.5, mood, false);
@@ -554,6 +564,7 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
   } else {
     const r = drawDragon(g, w, stage, mood);
     eyes = r.eyes;
+    head = r.head;
     wingOrigin = r.wingOrigin;
     if (stage >= UNLOCKS.breath && mood !== "restless") {
       mouth = r.mouth;
@@ -565,7 +576,7 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
     .filter(([x, y]) => x >= 0 && y >= 0 && x < GRID_W && y < GRID_H)
     .map(([x, y]) => ({ x, y, w: 1, role: "body" as const }));
 
-  return { wing: toRuns(w), body: toRuns(g), lids, breath: toRuns(b), motes: motes(element, stage), wingOrigin, mouth };
+  return { wing: toRuns(w), body: toRuns(g), lids, breath: toRuns(b), motes: motes(element, stage), wingOrigin, mouth, head };
 }
 
 const cache = new Map<string, SpriteLayers>();
