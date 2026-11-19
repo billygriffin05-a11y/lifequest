@@ -32,6 +32,8 @@ import {
   type BossBattle,
   type Rank,
 } from "../progress";
+import { getBudgetRewardMonths } from "@/features/finance/server/service";
+import { BUDGET_REWARD_XP } from "@/features/finance/money";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
 import { STARTER_ACTIONS } from "../starter-actions";
 
@@ -375,14 +377,21 @@ async function questCandidates(db: Db) {
 
 /** All bonus XP by category: streaks, weekly targets and completed daily quests. */
 async function bonusByCategory(db: Db, now: Date) {
-  const [rows, targets, candidates] = await Promise.all([ledgerFacts(db), weeklyTargets(db), questCandidates(db)]);
   const today = londonDateKey(now);
+  const [rows, targets, candidates, budgetMonths] = await Promise.all([
+    ledgerFacts(db),
+    weeklyTargets(db),
+    questCandidates(db),
+    getBudgetRewardMonths(db, today.slice(0, 7)),
+  ]);
   const streakMap = streaksByAction(rows, today, targets);
   const byCategory = new Map<string, number>();
   for (const s of streakMap.values()) byCategory.set(s.category, (byCategory.get(s.category) ?? 0) + s.bonusXp);
   for (const [c, b] of questBonusByCategory(candidates, goodDaysByAction(rows), today)) {
     byCategory.set(c, (byCategory.get(c) ?? 0) + b);
   }
+  // Months kept within budget grow the Finance dragon.
+  if (budgetMonths.length) byCategory.set("Finance", (byCategory.get("Finance") ?? 0) + budgetMonths.length * BUDGET_REWARD_XP);
   return { rows, targets, candidates, streakMap, byCategory, today };
 }
 

@@ -17,11 +17,11 @@ Built in batches of five, each with tests and its own PR. Status: ⬜ planned ·
 10. ✅ **Weekly boss battle** — beat the boss with good deeds; bad habits heal it.
 
 ## Batch 3 — Finance (local only, no bank login)
-11. ⬜ **Monthly budget** by category (pence-accurate).
-12. ⬜ **Spending log** — manual entries.
-13. ⬜ **Savings goals** with progress.
-14. ⬜ **Bank CSV import** (download from your bank, import locally; duplicates skipped).
-15. ⬜ **Budget rewards** — Honour/XP for staying under budget each month.
+11. ✅ **Monthly budget** by category (pence-accurate).
+12. ✅ **Spending log** — manual entries.
+13. ✅ **Savings goals** with progress.
+14. ✅ **Bank CSV import** (download from your bank, import locally; duplicates skipped).
+15. ✅ **Budget rewards** — Honour/XP for staying under budget each month.
 
 ## Batch 4 — Body
 16. ⬜ **Workout log** — exercises, sets, reps, weight; personal bests.

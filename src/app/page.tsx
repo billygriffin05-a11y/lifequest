@@ -33,6 +33,10 @@ export default function Home() {
           <Link href="/achievements" className="inline-flex min-h-11 items-center text-sm text-silver-300 underline underline-offset-4 hover:text-gold-300">
             Achievements
           </Link>
+          <span className="mx-2 text-silver-500" aria-hidden="true">·</span>
+          <Link href="/money" className="inline-flex min-h-11 items-center text-sm text-silver-300 underline underline-offset-4 hover:text-gold-300">
+            Money
+          </Link>
         </p>
         <p className="mt-8 text-sm text-silver-500">
           Server status: <a className="text-emerald-300 underline underline-offset-4 hover:text-emerald-400" href="/api/health">/api/health</a>
