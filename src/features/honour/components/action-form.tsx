@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 import { createActionAction, updateActionAction, type FormState } from "../server/actions";
 import { MAX_POINTS, SUGGESTED_CATEGORIES } from "../schemas";
+import { EmojiPicker } from "./emoji-picker";
 
 interface Initial {
   id?: string;
@@ -17,6 +18,24 @@ const EMPTY: Initial = { name: "", kind: "good", points: 10, icon: "⭐", catego
 
 const input =
   "mt-1 block min-h-11 w-full rounded-lg border border-obsidian-600 bg-obsidian-950 px-3 text-silver-100 placeholder:text-silver-500 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-400";
+
+function IconField({
+  inputProps,
+  start,
+  idPrefix,
+}: {
+  inputProps: Record<string, unknown>;
+  start: string;
+  idPrefix: string;
+}) {
+  const [icon, setIcon] = useState(start);
+  return (
+    <>
+      <input {...inputProps} className={input} value={icon} onChange={(e) => setIcon(e.target.value)} maxLength={16} required />
+      <EmojiPicker value={icon} onPick={setIcon} idPrefix={idPrefix} />
+    </>
+  );
+}
 
 export function ActionForm({ initial = EMPTY, mode = "create" }: { initial?: Initial; mode?: "create" | "edit" }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(
@@ -94,7 +113,13 @@ export function ActionForm({ initial = EMPTY, mode = "create" }: { initial?: Ini
         <label htmlFor={`${uid}-icon`} className="text-sm text-silver-300">
           Icon (emoji)
         </label>
-        <input {...field("icon")} className={input} defaultValue={v?.icon ?? initial.icon} maxLength={16} required />
+        {/* Remounts after each submission, so it resets after "Add" and keeps typed values after an error. */}
+        <IconField
+          key={JSON.stringify(state)}
+          inputProps={field("icon")}
+          start={mode === "create" && state.ok && state.message ? EMPTY.icon : (v?.icon ?? initial.icon)}
+          idPrefix={uid}
+        />
         {errorText("icon")}
       </div>
 
