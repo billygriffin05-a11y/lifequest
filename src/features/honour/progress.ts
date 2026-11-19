@@ -218,3 +218,66 @@ export function heatmapWeeks(todayKey: string, weeks = 12): string[][] {
     Array.from({ length: 7 }, (_, d) => fromUtc(monday - (weeks - 1 - w) * 7 * DAY + d * DAY)),
   );
 }
+
+// ── Weekly boss battle ───────────────────────────────────────────────────────
+
+export const BOSSES = [
+  { name: "Sloth the Couch Wyrm", emoji: "🦥" },
+  { name: "Gorgon of Doomscroll", emoji: "📱" },
+  { name: "The Takeaway Troll", emoji: "🍔" },
+  { name: "Procrastinor the Grey", emoji: "⏳" },
+  { name: "The Midnight Lich", emoji: "🌙" },
+  { name: "Impulse Imp", emoji: "🛍️" },
+  { name: "Lord Excuse", emoji: "🤥" },
+  { name: "The Fog Hydra", emoji: "🌫️" },
+] as const;
+
+export const BOSS_HP = 300;
+export const BOSS_XP_REWARD = 100;
+export const BOSS_GOLD_REWARD = 50;
+
+export interface BossBattle {
+  weekStart: string;
+  name: string;
+  emoji: string;
+  hp: number;
+  /** Good-deed Honour dealt this week. */
+  damage: number;
+  /** Bad-habit Honour healed this week. */
+  healed: number;
+  hpLeft: number;
+  defeated: boolean;
+}
+
+export function bossForWeek(weekKey: string) {
+  return BOSSES[hash(`boss:${weekKey}`) % BOSSES.length];
+}
+
+/** Good deeds hit the boss; bad habits heal it. Defeated when net damage ≥ HP. */
+export function bossBattle(weekKey: string, goodHonour: number, badHonour: number): BossBattle {
+  const boss = bossForWeek(weekKey);
+  const net = Math.max(0, goodHonour - badHonour);
+  return {
+    weekStart: weekKey,
+    name: boss.name,
+    emoji: boss.emoji,
+    hp: BOSS_HP,
+    damage: goodHonour,
+    healed: badHonour,
+    hpLeft: Math.max(0, BOSS_HP - net),
+    defeated: net >= BOSS_HP,
+  };
+}
+
+/** Per-week good/bad Honour (undo-netted) from ledger rows. */
+export function honourByWeek(rows: readonly { kind: string; occurredOn: string; honourDelta: number }[]) {
+  const out = new Map<string, { good: number; bad: number }>();
+  for (const r of rows) {
+    const w = weekStart(r.occurredOn);
+    const acc = out.get(w) ?? { good: 0, bad: 0 };
+    if (r.kind === "good") acc.good += r.honourDelta;
+    else acc.bad -= r.honourDelta;
+    out.set(w, acc);
+  }
+  return out;
+}

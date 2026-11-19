@@ -17,6 +17,7 @@ import {
 } from "../server/service";
 import { ActionForm } from "./action-form";
 import { LogButton } from "./log-button";
+import { BossCard } from "./boss-card";
 import { LevelUp } from "./level-up";
 import { NoteEditor } from "./note-editor";
 import { RankCard } from "./rank-card";
@@ -134,6 +135,8 @@ export async function HonourBoard({
           <TrendChart data={trend} />
         </div>
       </section>
+
+      <BossCard boss={progress.boss} wins={progress.bossWins} />
 
       {/* Daily quests */}
       {progress.quests.length > 0 && (

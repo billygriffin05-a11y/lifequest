@@ -19,7 +19,19 @@ import {
   type DailyPoint,
   type HonourSummary,
 } from "../rules";
-import { goodDaysByAction, questBonusByCategory, questsForDay, rankForXp, streaksByAction, type Rank } from "../progress";
+import {
+  BOSS_XP_REWARD,
+  bossBattle,
+  goodDaysByAction,
+  honourByWeek,
+  questBonusByCategory,
+  questsForDay,
+  rankForXp,
+  streaksByAction,
+  weekStart,
+  type BossBattle,
+  type Rank,
+} from "../progress";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
 import { STARTER_ACTIONS } from "../starter-actions";
 
@@ -296,7 +308,16 @@ export async function setEntryNote(db: Db, entryId: string, note: string | null)
 
 async function ledgerFacts(db: Db) {
   return db.pointEntry.findMany({
-    select: { id: true, actionId: true, actionCategory: true, kind: true, occurredOn: true, reversesEntryId: true, xpDelta: true },
+    select: {
+      id: true,
+      actionId: true,
+      actionCategory: true,
+      kind: true,
+      occurredOn: true,
+      reversesEntryId: true,
+      xpDelta: true,
+      honourDelta: true,
+    },
   });
 }
 
@@ -324,6 +345,12 @@ export interface PlayerProgress {
   weekly: Record<string, WeeklyProgress>;
   /** Today's 3 quests. */
   quests: TodayQuest[];
+  /** This week's boss battle. */
+  boss: BossBattle;
+  /** Bosses defeated in all weeks so far. */
+  bossWins: number;
+  /** Good-deed Honour earned (net), used for gold. */
+  goodHonour: number;
 }
 
 async function weeklyTargets(db: Db): Promise<Map<string, number | null>> {
@@ -362,7 +389,13 @@ async function bonusByCategory(db: Db, now: Date) {
 export async function getPlayerProgress(db: Db, now = new Date()): Promise<PlayerProgress> {
   const { rows, targets, candidates, streakMap, byCategory, today } = await bonusByCategory(db, now);
   const baseXp = rows.reduce((n, r) => n + r.xpDelta, 0);
-  const bonusXp = [...byCategory.values()].reduce((a, b) => a + b, 0);
+  const weeks = honourByWeek(rows);
+  let bossWins = 0;
+  for (const [w, h] of weeks) if (w <= weekStart(today) && bossBattle(w, h.good, h.bad).defeated) bossWins++;
+  const thisWeek = weeks.get(weekStart(today)) ?? { good: 0, bad: 0 };
+  const boss = bossBattle(weekStart(today), thisWeek.good, thisWeek.bad);
+  const goodHonour = rows.filter((r) => r.kind === "good").reduce((n, r) => n + r.honourDelta, 0);
+  const bonusXp = [...byCategory.values()].reduce((a, b) => a + b, 0) + bossWins * BOSS_XP_REWARD;
   const streaks: Record<string, number> = {};
   const weekly: Record<string, WeeklyProgress> = {};
   for (const [actionId, s] of streakMap) streaks[actionId] = s.current;
@@ -375,7 +408,18 @@ export async function getPlayerProgress(db: Db, now = new Date()): Promise<Playe
     const c = candidates.find((x) => x.id === q.id)!;
     return { actionId: c.id, name: c.name, icon: c.icon, done: doneToday.get(c.id)?.days.has(today) ?? false };
   });
-  return { baseXp, bonusXp, totalXp: baseXp + bonusXp, rank: rankForXp(baseXp + bonusXp), streaks, weekly, quests };
+  return {
+    baseXp,
+    bonusXp,
+    totalXp: baseXp + bonusXp,
+    rank: rankForXp(baseXp + bonusXp),
+    streaks,
+    weekly,
+    quests,
+    boss,
+    bossWins,
+    goodHonour,
+  };
 }
 
 /** Bonus XP (streaks, weekly targets, quests) per action category (feeds each area's dragon). */

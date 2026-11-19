@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { HomeRank } from "@/features/honour/components/home-rank";
+import { HomeHero } from "@/features/treasury/components/home-hero";
 
 export default function Home() {
   return (
@@ -9,6 +10,7 @@ export default function Home() {
         <h1 className="font-display text-4xl font-bold tracking-wide text-gold-300 sm:text-5xl">LIFEQUEST</h1>
         <p className="mt-4 text-silver-300">Your life, forged into an epic quest.</p>
         <Suspense fallback={<p className="mt-6 text-silver-300">Reading your legend…</p>}>
+          <HomeHero />
           <HomeRank />
         </Suspense>
         <Link

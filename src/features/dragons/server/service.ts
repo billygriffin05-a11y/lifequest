@@ -13,14 +13,16 @@ export interface DragonView {
   /** The owner's chosen name, or the default dragon name. */
   displayName: string;
   customName: string | null;
+  /** Equipped shop cosmetic, if any. */
+  accessory: string | null;
   growth: Growth;
   mood: Mood;
   recentHonour: number;
 }
 
-async function profiles(db: PrismaClient): Promise<Map<string, string | null>> {
+async function profiles(db: PrismaClient) {
   const rows = await db.dragonProfile.findMany();
-  return new Map(rows.map((r) => [r.areaId, r.customName]));
+  return new Map(rows.map((r) => [r.areaId, r]));
 }
 
 /** One dragon per life area, grown from that area's XP, mood from its last-7-days Honour. */
@@ -51,11 +53,13 @@ export async function getDragons(db: PrismaClient, now = new Date()): Promise<Dr
 
   return AREAS.map((area) => {
     const acc = byArea.get(area.id) ?? { xp: 0, recentHonour: 0, recentEntries: 0 };
-    const customName = names.get(area.id) ?? null;
+    const customName = names.get(area.id)?.customName ?? null;
+    const accessory = names.get(area.id)?.accessory ?? null;
     return {
       area,
       displayName: customName ?? area.dragonName,
       customName,
+      accessory,
       growth: growthForXp(acc.xp),
       mood: moodFor(acc.recentHonour, acc.recentEntries),
       recentHonour: acc.recentHonour,
