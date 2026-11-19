@@ -6,9 +6,10 @@ import {
   disconnectCalendarAction,
   importClientFromDownloadsAction,
   importClientUploadAction,
+  saveReminderAction,
   syncCalendarNowAction,
 } from "../server/actions";
-import { getStatus } from "../server/service";
+import { getDailyReminder, getStatus } from "../server/service";
 
 const MESSAGES: Record<string, { text: string; ok: boolean }> = {
   connected: { text: "Google Calendar linked. New deeds will appear in your LIFEQUEST calendar.", ok: true },
@@ -20,6 +21,9 @@ const MESSAGES: Record<string, { text: string; ok: boolean }> = {
   "client-not-found": { text: "No client_secret_….json file found in your Downloads folder.", ok: false },
   "client-invalid": { text: "That file isn't a Google “Web application” OAuth client JSON.", ok: false },
   "client-too-large": { text: "That file is too large to be a Google client JSON.", ok: false },
+  "reminder-on": { text: "Daily reminder saved. It will appear in your LIFEQUEST calendar shortly.", ok: true },
+  "reminder-off": { text: "Daily reminder turned off.", ok: true },
+  "reminder-invalid": { text: "Please enter a valid time.", ok: false },
 };
 
 const btn =
@@ -30,7 +34,7 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
   const sp = await searchParams;
   const flag = typeof sp.google === "string" ? MESSAGES[sp.google] : undefined;
   const cfg = loadGoogleConfig(getDataPaths());
-  const status = await getStatus(prisma, cfg);
+  const [status, reminder] = await Promise.all([getStatus(prisma, cfg), getDailyReminder(prisma)]);
 
   return (
     <section aria-labelledby="gcal-heading" className="rounded-2xl border border-obsidian-600 bg-obsidian-900/80 p-5">
@@ -96,6 +100,42 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
           </>
         )}
       </div>
+
+      {status.connected && (
+        <div className="mt-6 rounded-xl border border-obsidian-700 p-4" data-testid="reminder">
+          <h3 className="font-display text-lg text-gold-300">Daily reminder</h3>
+          <p className="mt-1 text-sm text-silver-300">
+            A repeating event with a pop-up alert in your LIFEQUEST calendar, so Google Calendar nudges you on your
+            phone and PC.{" "}
+            <span className="text-silver-100" data-testid="reminder-status">
+              {reminder.enabled ? `On — every day at ${reminder.time}.` : "Off."}
+            </span>
+          </p>
+          <form action={saveReminderAction} className="mt-3 flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor="reminder-time" className="block text-sm text-silver-300">
+                Time
+              </label>
+              <input
+                id="reminder-time"
+                name="time"
+                type="time"
+                defaultValue={reminder.time}
+                required
+                className="mt-1 min-h-11 rounded-lg border border-obsidian-600 bg-obsidian-950 px-3 text-silver-100 focus-visible:outline-2 focus-visible:outline-emerald-400"
+              />
+            </div>
+            <button type="submit" name="enabled" value="true" className={`${btn} bg-gold-500 text-obsidian-950 hover:bg-gold-400`}>
+              {reminder.enabled ? "Update reminder" : "Turn on reminder"}
+            </button>
+            {reminder.enabled && (
+              <button type="submit" name="enabled" value="false" className={`${btn} border border-silver-500/40 text-silver-300 hover:text-silver-100`}>
+                Turn off
+              </button>
+            )}
+          </form>
+        </div>
+      )}
 
       {!status.configured && (
         <div className="mt-4 rounded-xl border border-gold-500/30 p-4 text-sm">

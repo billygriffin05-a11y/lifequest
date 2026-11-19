@@ -65,19 +65,64 @@ export function bonusForRun(length: number): number {
   return Math.floor(length / 7) * STREAK_BONUS.every7 + Math.floor(length / 30) * STREAK_BONUS.every30;
 }
 
-export interface StreakInfo {
-  current: number;
-  bonusXp: number;
-  category: string;
+// ── Weekly targets (Mon–Sun) ─────────────────────────────────────────────────
+
+export const WEEKLY_TARGET_BONUS = 15;
+
+/** Monday (YYYY-MM-DD) of the week containing `key`. */
+export function weekStart(key: string): string {
+  const ms = toUtc(key);
+  const dow = new Date(ms).getUTCDay(); // 0 = Sunday
+  return fromUtc(ms - ((dow + 6) % 7) * DAY);
 }
 
-export function streaksByAction(rows: readonly LedgerFact[], todayKey: string): Map<string, StreakInfo> {
+/** Distinct done-days per week (keyed by Monday). */
+export function daysPerWeek(days: ReadonlySet<string>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const d of days) {
+    const w = weekStart(d);
+    out.set(w, (out.get(w) ?? 0) + 1);
+  }
+  return out;
+}
+
+/** Bonus for every week the target was met (target 1–7; null = no target). */
+export function weeklyBonus(days: ReadonlySet<string>, target: number | null): { weeksMet: number; bonusXp: number } {
+  if (!target) return { weeksMet: 0, bonusXp: 0 };
+  let weeksMet = 0;
+  for (const n of daysPerWeek(days).values()) if (n >= target) weeksMet++;
+  return { weeksMet, bonusXp: weeksMet * WEEKLY_TARGET_BONUS };
+}
+
+export interface StreakInfo {
+  current: number;
+  /** Longest run ever. */
+  best: number;
+  /** Streak bonus + weekly-target bonus. */
+  bonusXp: number;
+  category: string;
+  /** Days done this week (Mon–Sun). */
+  thisWeek: number;
+  weeksMet: number;
+}
+
+export function streaksByAction(
+  rows: readonly LedgerFact[],
+  todayKey: string,
+  targets: ReadonlyMap<string, number | null> = new Map(),
+): Map<string, StreakInfo> {
   const out = new Map<string, StreakInfo>();
+  const thisMonday = weekStart(todayKey);
   for (const [actionId, { days, category }] of goodDaysByAction(rows)) {
+    const runs = runLengths(days);
+    const weekly = weeklyBonus(days, targets.get(actionId) ?? null);
     out.set(actionId, {
       current: currentStreak(days, todayKey),
-      bonusXp: runLengths(days).reduce((n, len) => n + bonusForRun(len), 0),
+      best: Math.max(0, ...runs),
+      bonusXp: runs.reduce((n, len) => n + bonusForRun(len), 0) + weekly.bonusXp,
       category,
+      thisWeek: daysPerWeek(days).get(thisMonday) ?? 0,
+      weeksMet: weekly.weeksMet,
     });
   }
   return out;

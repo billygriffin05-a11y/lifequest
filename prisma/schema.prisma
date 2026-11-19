@@ -80,6 +80,16 @@ model CalendarOutbox {
   @@index([doneAt])
 }
 
+// ── Dragons ──────────────────────────────────────────────────────────────────
+
+/// Owner customisations for an area dragon (growth itself is derived from XP).
+model DragonProfile {
+  /// Area id, e.g. "fitness".
+  areaId     String   @id
+  customName String?
+  updatedAt  DateTime @updatedAt
+}
+
 // ── Honour: customisable good / bad actions ─────────────────────────────────
 
 /// A user-defined good or bad action, e.g. "Gym session" (+20, good) or
@@ -95,6 +105,8 @@ model PointAction {
   icon            String
   category        String
   sortOrder       Int          @default(0)
+  /// Optional goal: times per week (Mon–Sun, Europe/London). Good actions only.
+  weeklyTarget    Int?
   archivedAt      DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt

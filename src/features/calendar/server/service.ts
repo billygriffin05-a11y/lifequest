@@ -12,12 +12,21 @@ import {
   GoogleApiError,
   insertEvent,
   patchEvent,
+  upsertEvent,
   refreshAccessToken,
   revokeToken,
   type Fetch,
   type TokenSet,
 } from "../google/api";
 import type { GoogleConfig } from "../google/config";
+import {
+  DEFAULT_REMINDER,
+  REMINDER_EVENT_ID,
+  REMINDER_SETTING_KEY,
+  reminderEventBody,
+  reminderSchema,
+  type ReminderSettings,
+} from "../reminder";
 
 export interface CalendarDeps {
   db: PrismaClient;
@@ -139,6 +148,32 @@ export async function enqueuePatch(db: PrismaClient, entryId: string, kind: stri
   return true;
 }
 
+// ── Daily reminder ───────────────────────────────────────────────────────────
+
+export async function getDailyReminder(db: PrismaClient): Promise<ReminderSettings> {
+  const row = await db.appSetting.findUnique({ where: { key: REMINDER_SETTING_KEY } });
+  if (!row) return DEFAULT_REMINDER;
+  const parsed = reminderSchema.safeParse(JSON.parse(row.value));
+  return parsed.success ? parsed.data : DEFAULT_REMINDER;
+}
+
+/** Save the reminder setting and queue the matching calendar change. Needs a linked calendar. */
+export async function setDailyReminder(db: PrismaClient, settings: ReminderSettings, todayKey: string): Promise<void> {
+  const value = JSON.stringify(reminderSchema.parse(settings));
+  await db.appSetting.upsert({
+    where: { key: REMINDER_SETTING_KEY },
+    create: { key: REMINDER_SETTING_KEY, value },
+    update: { value, version: { increment: 1 } },
+  });
+  await db.auditEvent.create({ data: { actor: "owner", action: settings.enabled ? "reminder.on" : "reminder.off", entityType: "AppSetting" } });
+  if (!(await isConnected(db))) return;
+  await db.calendarOutbox.create({
+    data: settings.enabled
+      ? { op: "upsert", eventId: REMINDER_EVENT_ID, payload: JSON.stringify(reminderEventBody(settings.time, todayKey)) }
+      : { op: "delete", eventId: REMINDER_EVENT_ID },
+  });
+}
+
 /** Queue removal of the event for an undone deed (no-op when not connected). */
 export async function enqueueDelete(db: PrismaClient, entryId: string): Promise<boolean> {
   if (!(await isConnected(db))) return false;
@@ -182,6 +217,7 @@ export async function processOutbox(deps: CalendarDeps, limit = 25): Promise<Syn
   for (const item of items) {
     try {
       if (item.op === "create" && item.payload) await insertEvent(deps.fetchImpl, token, calendarId, JSON.parse(item.payload));
+      else if (item.op === "upsert" && item.payload) await upsertEvent(deps.fetchImpl, token, calendarId, JSON.parse(item.payload));
       else if (item.op === "patch" && item.payload) await patchEvent(deps.fetchImpl, token, calendarId, item.eventId, JSON.parse(item.payload));
       else if (item.op === "delete") await deleteEvent(deps.fetchImpl, token, calendarId, item.eventId);
       await deps.db.calendarOutbox.update({ where: { id: item.id }, data: { doneAt: new Date(), lastError: null } });

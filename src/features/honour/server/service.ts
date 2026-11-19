@@ -51,7 +51,9 @@ export function listActions(db: Db, opts: { includeArchived?: boolean } = {}) {
 export async function createAction(db: Db, input: ActionInput) {
   const data = actionInputSchema.parse(input);
   const count = await db.pointAction.count();
-  const action = await db.pointAction.create({ data: { ...data, sortOrder: count, updatedByDevice: DEVICE } });
+  const action = await db.pointAction.create({
+    data: { ...data, weeklyTarget: data.kind === "good" ? (data.weeklyTarget ?? null) : null, sortOrder: count, updatedByDevice: DEVICE },
+  });
   await db.auditEvent.create({
     data: { actor: DEVICE, action: "honour.action.create", entityType: "PointAction", entityId: action.id },
   });
@@ -65,7 +67,7 @@ export async function updateAction(db: Db, id: string, input: ActionInput) {
   // Past entries keep their snapshot values; only future logs use the new values.
   const updated = await db.pointAction.update({
     where: { id },
-    data: { ...data, version: { increment: 1 }, updatedByDevice: DEVICE },
+    data: { ...data, weeklyTarget: data.kind === "good" ? (data.weeklyTarget ?? null) : null, version: { increment: 1 }, updatedByDevice: DEVICE },
   });
   await db.auditEvent.create({
     data: { actor: DEVICE, action: "honour.action.update", entityType: "PointAction", entityId: id },
@@ -298,35 +300,110 @@ async function ledgerFacts(db: Db) {
   });
 }
 
+export interface WeeklyProgress {
+  done: number;
+  target: number;
+}
+
 export interface PlayerProgress {
   baseXp: number;
+  /** Streak + weekly-target bonus XP (derived). */
   bonusXp: number;
   totalXp: number;
   rank: Rank;
   /** Current streak (days) per action id. */
   streaks: Record<string, number>;
+  /** This week's progress for actions that have a weekly target. */
+  weekly: Record<string, WeeklyProgress>;
+}
+
+async function weeklyTargets(db: Db): Promise<Map<string, number | null>> {
+  const actions = await db.pointAction.findMany({ select: { id: true, weeklyTarget: true } });
+  return new Map(actions.map((a) => [a.id, a.weeklyTarget]));
 }
 
 export async function getPlayerProgress(db: Db, now = new Date()): Promise<PlayerProgress> {
-  const rows = await ledgerFacts(db);
+  const [rows, targets] = await Promise.all([ledgerFacts(db), weeklyTargets(db)]);
   const baseXp = rows.reduce((n, r) => n + r.xpDelta, 0);
-  const streakMap = streaksByAction(rows, londonDateKey(now));
+  const streakMap = streaksByAction(rows, londonDateKey(now), targets);
   let bonusXp = 0;
   const streaks: Record<string, number> = {};
+  const weekly: Record<string, WeeklyProgress> = {};
   for (const [actionId, s] of streakMap) {
     bonusXp += s.bonusXp;
     streaks[actionId] = s.current;
   }
-  return { baseXp, bonusXp, totalXp: baseXp + bonusXp, rank: rankForXp(baseXp + bonusXp), streaks };
+  for (const [actionId, target] of targets) {
+    if (target) weekly[actionId] = { done: streakMap.get(actionId)?.thisWeek ?? 0, target };
+  }
+  return { baseXp, bonusXp, totalXp: baseXp + bonusXp, rank: rankForXp(baseXp + bonusXp), streaks, weekly };
 }
 
-/** Streak bonus XP per action category (feeds each area's dragon). */
+/** Bonus XP (streaks + weekly targets) per action category (feeds each area's dragon). */
 export async function getStreakBonusByCategory(db: Db, now = new Date()): Promise<Map<string, number>> {
+  const [rows, targets] = await Promise.all([ledgerFacts(db), weeklyTargets(db)]);
   const out = new Map<string, number>();
-  for (const s of streaksByAction(await ledgerFacts(db), londonDateKey(now)).values()) {
+  for (const s of streaksByAction(rows, londonDateKey(now), targets).values()) {
     out.set(s.category, (out.get(s.category) ?? 0) + s.bonusXp);
   }
   return out;
+}
+
+export interface LedgerItem {
+  id: string;
+  actionName: string;
+  actionIcon: string;
+  actionCategory: string;
+  kind: string;
+  xpDelta: number;
+  honourDelta: number;
+  occurredOn: string;
+  occurredAt: Date;
+  note: string | null;
+  undone: boolean;
+  isReversal: boolean;
+}
+
+/** The whole ledger, oldest first, with undo flags — for history views (dragon timelines). */
+export async function listLedger(db: Db): Promise<LedgerItem[]> {
+  const rows = await db.pointEntry.findMany({ orderBy: [{ occurredOn: "asc" }, { occurredAt: "asc" }] });
+  const undone = new Set(rows.flatMap((r) => (r.reversesEntryId ? [r.reversesEntryId] : [])));
+  return rows.map((r) => ({
+    id: r.id,
+    actionName: r.actionName,
+    actionIcon: r.actionIcon,
+    actionCategory: r.actionCategory,
+    kind: r.kind,
+    xpDelta: r.xpDelta,
+    honourDelta: r.honourDelta,
+    occurredOn: r.occurredOn,
+    occurredAt: r.occurredAt,
+    note: r.note,
+    undone: undone.has(r.id),
+    isReversal: r.reversesEntryId !== null,
+  }));
+}
+
+/** Stats other features (achievements) derive badges from. Undo-aware. */
+export async function getLedgerStats(db: Db, now = new Date()) {
+  const [rows, targets, notes] = await Promise.all([
+    ledgerFacts(db),
+    weeklyTargets(db),
+    db.pointEntry.count({ where: { note: { not: null }, reversesEntryId: null } }),
+  ]);
+  const undone = new Set(rows.flatMap((r) => (r.reversesEntryId ? [r.reversesEntryId] : [])));
+  const active = rows.filter((r) => !r.reversesEntryId && !undone.has(r.id));
+  const good = active.filter((r) => r.kind === "good");
+  const streaks = [...streaksByAction(rows, londonDateKey(now), targets).values()];
+  return {
+    goodDeeds: good.length,
+    goodDays: new Set(good.map((r) => r.occurredOn)),
+    badDays: new Set(active.filter((r) => r.kind === "bad").map((r) => r.occurredOn)),
+    goodCategories: new Set(good.map((r) => r.actionCategory)),
+    bestStreak: Math.max(0, ...streaks.map((s) => s.best)),
+    weeksMet: streaks.reduce((n, s) => n + s.weeksMet, 0),
+    notes,
+  };
 }
 
 export interface TodayEntry {

@@ -47,3 +47,8 @@ export async function onDeedUndone(originalEntryId: string): Promise<void> {
     console.error("[calendar] could not queue event removal");
   }
 }
+
+/** Push queued calendar changes right after the current request. */
+export function syncSoon(): void {
+  syncInBackground();
+}

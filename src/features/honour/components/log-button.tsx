@@ -14,9 +14,11 @@ interface Props {
   doneToday?: boolean;
   /** Current streak in days (good actions). */
   streak?: number;
+  /** This week's progress toward a weekly goal. */
+  weekly?: { done: number; target: number };
 }
 
-export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false, streak = 0 }: Props) {
+export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false, streak = 0, weekly }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const good = kind === "good";
@@ -54,6 +56,14 @@ export function LogButton({ actionId, name, icon, points, kind, category, doneTo
             {streak >= 2 && (
               <span className="ml-2 font-semibold text-gold-300" data-testid="streak">
                 🔥 {streak}-day streak
+              </span>
+            )}
+            {weekly && (
+              <span
+                className={`ml-2 font-semibold ${weekly.done >= weekly.target ? "text-emerald-300" : "text-silver-100"}`}
+                data-testid="weekly"
+              >
+                {weekly.done >= weekly.target ? "✓" : "📅"} {Math.min(weekly.done, weekly.target)}/{weekly.target} this week
               </span>
             )}
           </span>
