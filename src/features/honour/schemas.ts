@@ -53,7 +53,9 @@ export type ActionInput = z.input<typeof actionInputSchema>;
 export const idSchema = z.string().trim().min(1).max(64);
 export const idempotencyKeySchema = z.uuid();
 
-export const logInputSchema = z.object({ actionId: idSchema, idempotencyKey: idempotencyKeySchema }).strict();
+export const logInputSchema = z
+  .object({ actionId: idSchema, idempotencyKey: idempotencyKeySchema, day: z.enum(["today", "yesterday"]).optional() })
+  .strict();
 export const undoInputSchema = z.object({ entryId: idSchema, idempotencyKey: idempotencyKeySchema }).strict();
 
 export const MAX_NOTE = 140;

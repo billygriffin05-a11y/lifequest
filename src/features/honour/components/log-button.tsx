@@ -16,9 +16,11 @@ interface Props {
   streak?: number;
   /** This week's progress toward a weekly goal. */
   weekly?: { done: number; target: number };
+  /** Log for yesterday instead of today. */
+  day?: "today" | "yesterday";
 }
 
-export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false, streak = 0, weekly }: Props) {
+export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false, streak = 0, weekly, day = "today" }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const good = kind === "good";
@@ -30,13 +32,15 @@ export function LogButton({ actionId, name, icon, points, kind, category, doneTo
         type="button"
         disabled={pending || doneToday}
         aria-label={
-          doneToday ? `${name}: done today` : `Log ${name}: ${good ? "plus" : "minus"} ${points} Honour`
+          doneToday
+            ? `${name}: done ${day === "yesterday" ? "yesterday" : "today"}`
+            : `Log ${name}${day === "yesterday" ? " for yesterday" : ""}: ${good ? "plus" : "minus"} ${points} Honour`
         }
         onClick={() =>
           startTransition(async () => {
             setError(null);
             // A fresh key per tap: retries of this request can never double-count.
-            const result = await logActionAction({ actionId, idempotencyKey: crypto.randomUUID() });
+            const result = await logActionAction({ actionId, idempotencyKey: crypto.randomUUID(), day });
             if (!result.ok) setError(result.message ?? "Could not log that.");
           })
         }
@@ -69,7 +73,7 @@ export function LogButton({ actionId, name, icon, points, kind, category, doneTo
           </span>
         </span>
         {doneToday ? (
-          <span className="text-sm font-semibold text-silver-300">✓ Done today</span>
+          <span className="text-sm font-semibold text-silver-300">✓ Done {day === "yesterday" ? "yesterday" : "today"}</span>
         ) : (
           <span className={`font-display text-lg font-bold ${good ? "text-emerald-300" : "text-ember-300"}`}>{signed}</span>
         )}

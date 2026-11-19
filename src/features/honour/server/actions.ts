@@ -11,6 +11,7 @@ import { z } from "zod";
 import { onDeedLogged, onDeedNoteChanged, onDeedUndone } from "@/features/calendar/server/runtime";
 import { prisma } from "@/server/db/client";
 import { actionInputSchema, idSchema, logInputSchema, noteInputSchema, undoInputSchema } from "../schemas";
+import { logMomentFor } from "../rules";
 import * as service from "./service";
 
 type Field = "name" | "kind" | "points" | "icon" | "category" | "weeklyTarget";
@@ -107,12 +108,18 @@ export async function addStarterActionsAction(): Promise<void> {
   refresh();
 }
 
-export async function logActionAction(input: { actionId: string; idempotencyKey: string }): Promise<FormState> {
+export async function logActionAction(input: {
+  actionId: string;
+  idempotencyKey: string;
+  day?: "today" | "yesterday";
+}): Promise<FormState> {
   const parsed = logInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Invalid request." };
   let entry;
   try {
-    entry = await service.logAction(prisma, parsed.data);
+    // "Forgot yesterday?" logs at the same time of day, 24 hours ago.
+    const when = logMomentFor(parsed.data.day ?? "today");
+    entry = await service.logAction(prisma, { actionId: parsed.data.actionId, idempotencyKey: parsed.data.idempotencyKey }, when);
   } catch (err) {
     return failure(err);
   }
