@@ -134,6 +134,20 @@ export async function insertEvent(fetchImpl: Fetch, accessToken: string, calenda
   throw new GoogleApiError(`Google Calendar insert failed (${res.status})`, res.status);
 }
 
+/** Patch fields of an existing event (e.g. description after a note is added). */
+export async function patchEvent(fetchImpl: Fetch, accessToken: string, calendarId: string, eventId: string, fields: object): Promise<void> {
+  const res = await calendarCall(
+    fetchImpl,
+    accessToken,
+    "PATCH",
+    `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    fields,
+  );
+  // Event deleted meanwhile (undo) → nothing to update.
+  if (res.ok || res.status === 404 || res.status === 410) return;
+  throw new GoogleApiError(`Google Calendar update failed (${res.status})`, res.status);
+}
+
 /** Delete by id: already gone (404/410) counts as success. */
 export async function deleteEvent(fetchImpl: Fetch, accessToken: string, calendarId: string, eventId: string): Promise<void> {
   const res = await calendarCall(

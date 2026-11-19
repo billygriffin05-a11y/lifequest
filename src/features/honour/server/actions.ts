@@ -8,9 +8,9 @@
 import "server-only";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { onDeedLogged, onDeedUndone } from "@/features/calendar/server/runtime";
+import { onDeedLogged, onDeedNoteChanged, onDeedUndone } from "@/features/calendar/server/runtime";
 import { prisma } from "@/server/db/client";
-import { actionInputSchema, idSchema, logInputSchema, undoInputSchema } from "../schemas";
+import { actionInputSchema, idSchema, logInputSchema, noteInputSchema, undoInputSchema } from "../schemas";
 import * as service from "./service";
 
 type Field = "name" | "kind" | "points" | "icon" | "category";
@@ -132,4 +132,18 @@ export async function undoEntryAction(input: { entryId: string; idempotencyKey: 
   if (reversal.reversesEntryId) await onDeedUndone(reversal.reversesEntryId); // never throws
   refresh();
   return { ok: true };
+}
+
+export async function setEntryNoteAction(input: { entryId: string; note: string }): Promise<FormState> {
+  const parsed = noteInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid note." };
+  let entry;
+  try {
+    entry = await service.setEntryNote(prisma, parsed.data.entryId, parsed.data.note);
+  } catch (err) {
+    return failure(err);
+  }
+  await onDeedNoteChanged(entry.id, entry.kind, entry.note); // Google Calendar (if linked); never throws
+  refresh();
+  return { ok: true, message: entry.note ? "Note saved." : "Note removed." };
 }

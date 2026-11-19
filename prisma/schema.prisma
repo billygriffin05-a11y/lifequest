@@ -118,6 +118,8 @@ model PointEntry {
   actionIcon      String
   /// Category at the time of logging — decides which area dragon gets the XP.
   actionCategory  String      @default("Other")
+  /// Optional short note from the owner ("5k in 28 min"). Not part of scoring.
+  note            String?
   /// Signed change to the Honour score.
   honourDelta     Int
   /// Change to XP (good actions only; negative only when reversing a good entry).
