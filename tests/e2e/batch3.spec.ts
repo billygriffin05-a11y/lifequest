@@ -5,6 +5,8 @@ test("money page: starter budgets, add spending, savings goal", async ({ page })
   await page.goto("/money");
   await expect(page.getByRole("heading", { level: 1, name: "Money" })).toBeVisible();
   const starter = page.getByRole("button", { name: "Add starter categories" });
+  // The page streams in: wait for either state before deciding.
+  await expect(starter.or(page.getByTestId("budget-Groceries"))).toBeVisible();
   if (await starter.count()) await starter.click();
   await expect(page.getByTestId("budget-Groceries")).toBeVisible();
 

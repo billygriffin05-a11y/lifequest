@@ -39,7 +39,11 @@ test("habit heatmap page", async ({ page }) => {
   await page.goto("/honour");
   await page.getByRole("link", { name: "Habit heatmap" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Habit heatmap" })).toBeVisible();
-  await expect(page.getByRole("list", { name: "Habit heatmaps" }).getByRole("listitem").first()).toContainText("days in the last 12 weeks");
+  // On an empty database (tests run in any order) there are no actions yet.
+  const first = page.getByRole("list", { name: "Habit heatmaps" }).getByRole("listitem").first();
+  const empty = page.getByText("No actions yet — add some on the Honour page.");
+  await expect(first.or(empty)).toBeVisible();
+  if (await first.count()) await expect(first).toContainText("days in the last 12 weeks");
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(results.violations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);

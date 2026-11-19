@@ -24,11 +24,11 @@ Built in batches of five, each with tests and its own PR. Status: ⬜ planned ·
 15. ✅ **Budget rewards** — Honour/XP for staying under budget each month.
 
 ## Batch 4 — Body
-16. ⬜ **Workout log** — exercises, sets, reps, weight; personal bests.
-17. ⬜ **Running log** — distance, time, pace; PBs.
-18. ⬜ **Water tracker** — daily glasses.
-19. ⬜ **Sleep log** — bed/wake time, hours.
-20. ⬜ **Body weight** trend.
+16. ✅ **Workout log** — exercises, sets, reps, weight; personal bests.
+17. ✅ **Running log** — distance, time, pace; PBs.
+18. ✅ **Water tracker** — daily glasses.
+19. ✅ **Sleep log** — bed/wake time, hours.
+20. ✅ **Body weight** trend.
 
 ## Batch 5 — Mind
 21. ⬜ **Reading tracker** — books, pages, finish dates.
