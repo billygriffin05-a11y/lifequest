@@ -43,11 +43,14 @@ test("security+ cards: seed, reveal, review", async ({ page }) => {
   await page.goto("/mind/cards");
   await expect(page.getByRole("heading", { level: 1, name: "Security+ cards" })).toBeVisible();
   const seed = page.getByRole("button", { name: "Add Security+ starter deck" });
+  // The page streams in: wait for one of its states before deciding.
+  await expect(seed.or(page.getByTestId("card-under-review")).or(page.getByTestId("all-done"))).toBeVisible();
   if (await seed.count()) {
     await seed.click();
     await expect(page.getByTestId("banner")).toContainText("Security+ cards");
   }
   const card = page.getByTestId("card-under-review");
+  await expect(card.or(page.getByTestId("all-done"))).toBeVisible();
   if (await card.count()) {
     const question = await card.locator("p").nth(1).textContent();
     await card.getByText("Show answer").click();
