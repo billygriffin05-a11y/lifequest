@@ -91,3 +91,8 @@ export function summarise(rows: readonly LedgerRow[], todayKey: string): HonourS
   }
   return { honour, xp, today: { good, bad, net: good - bad } };
 }
+
+/** The moment to log at for "today" or "yesterday" (same time of day, 24 hours earlier). */
+export function logMomentFor(day: "today" | "yesterday", now: Date = new Date()): Date {
+  return day === "yesterday" ? new Date(now.getTime() - 86_400_000) : now;
+}

@@ -163,3 +163,58 @@ export function rankForXp(rawXp: number): Rank {
     percent: next ? Math.floor(((xp - RANKS[i].minXp) / (next.minXp - RANKS[i].minXp)) * 100) : 100,
   };
 }
+
+// ── Daily quests ─────────────────────────────────────────────────────────────
+
+export const QUEST_COUNT = 3;
+export const QUEST_BONUS = 20;
+
+export interface QuestCandidate {
+  id: string;
+  /** Day the action was created (YYYY-MM-DD) — only existing actions can be a quest. */
+  createdOn: string;
+  category: string;
+}
+
+function hash(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+/** Deterministic 3 quests for a day, picked from good actions that existed that day. */
+export function questsForDay(candidates: readonly QuestCandidate[], dayKey: string): QuestCandidate[] {
+  return candidates
+    .filter((c) => c.createdOn <= dayKey)
+    .map((c) => ({ c, k: hash(`${dayKey}:${c.id}`) }))
+    .sort((a, b) => a.k - b.k || a.c.id.localeCompare(b.c.id))
+    .slice(0, QUEST_COUNT)
+    .map((x) => x.c);
+}
+
+/** Bonus XP per category for every quest completed, from the first logged day to today. */
+export function questBonusByCategory(
+  candidates: readonly QuestCandidate[],
+  goodDays: ReadonlyMap<string, { days: Set<string> }>,
+  todayKey: string,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  const allDays = new Set<string>();
+  for (const { days } of goodDays.values()) for (const d of days) if (d <= todayKey) allDays.add(d);
+  for (const day of allDays) {
+    for (const q of questsForDay(candidates, day)) {
+      if (goodDays.get(q.id)?.days.has(day)) out.set(q.category, (out.get(q.category) ?? 0) + QUEST_BONUS);
+    }
+  }
+  return out;
+}
+
+// ── Habit heatmap ────────────────────────────────────────────────────────────
+
+/** The last `weeks` full Mon–Sun weeks ending with the current week, oldest first (columns of 7). */
+export function heatmapWeeks(todayKey: string, weeks = 12): string[][] {
+  const monday = toUtc(weekStart(todayKey));
+  return Array.from({ length: weeks }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => fromUtc(monday - (weeks - 1 - w) * 7 * DAY + d * DAY)),
+  );
+}

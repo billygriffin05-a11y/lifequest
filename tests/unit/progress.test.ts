@@ -9,6 +9,10 @@ import {
   weekStart,
   weeklyBonus,
   WEEKLY_TARGET_BONUS,
+  questsForDay,
+  questBonusByCategory,
+  QUEST_BONUS,
+  heatmapWeeks,
   streaksByAction,
   type LedgerFact,
 } from "@/features/honour/progress";
@@ -96,5 +100,41 @@ describe("weekly targets", () => {
     }));
     const s = streaksByAction(rows, "2026-11-19", new Map([["gym", 3]])).get("gym")!;
     expect(s).toMatchObject({ thisWeek: 3, weeksMet: 1, bonusXp: WEEKLY_TARGET_BONUS, current: 2, best: 2 });
+  });
+});
+
+describe("daily quests", () => {
+  const cands = ["a", "b", "c", "d", "e"].map((id) => ({ id, createdOn: "2026-11-01", category: id === "a" ? "Fitness" : "Study" }));
+
+  it("picks 3 deterministic quests per day, varying by day", () => {
+    const q1 = questsForDay(cands, "2026-11-19").map((q) => q.id);
+    expect(q1).toHaveLength(3);
+    expect(questsForDay(cands, "2026-11-19").map((q) => q.id)).toEqual(q1);
+    const differs = ["2026-11-20", "2026-11-21", "2026-11-22"].some((d) => questsForDay(cands, d).map((q) => q.id).join() !== q1.join());
+    expect(differs).toBe(true);
+  });
+
+  it("only uses actions that existed that day", () => {
+    const late = [{ id: "z", createdOn: "2026-11-30", category: "X" }];
+    expect(questsForDay(late, "2026-11-19")).toEqual([]);
+  });
+
+  it("pays +20 per completed quest, by category", () => {
+    const day = "2026-11-19";
+    const quests = questsForDay(cands, day);
+    const done = new Map(quests.map((q) => [q.id, { days: new Set([day]) }]));
+    const bonus = questBonusByCategory(cands, done, day);
+    const total = [...bonus.values()].reduce((a, b) => a + b, 0);
+    expect(total).toBe(3 * QUEST_BONUS);
+  });
+});
+
+describe("heatmap weeks", () => {
+  it("returns 12 Monday-first weeks ending this week", () => {
+    const w = heatmapWeeks("2026-11-19");
+    expect(w).toHaveLength(12);
+    expect(w[11][0]).toBe("2026-11-16");
+    expect(w[11][6]).toBe("2026-11-22");
+    expect(w[0][0]).toBe("2026-08-31");
   });
 });

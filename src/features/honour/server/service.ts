@@ -19,7 +19,7 @@ import {
   type DailyPoint,
   type HonourSummary,
 } from "../rules";
-import { rankForXp, streaksByAction, type Rank } from "../progress";
+import { goodDaysByAction, questBonusByCategory, questsForDay, rankForXp, streaksByAction, type Rank } from "../progress";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
 import { STARTER_ACTIONS } from "../starter-actions";
 
@@ -305,9 +305,16 @@ export interface WeeklyProgress {
   target: number;
 }
 
+export interface TodayQuest {
+  actionId: string;
+  name: string;
+  icon: string;
+  done: boolean;
+}
+
 export interface PlayerProgress {
   baseXp: number;
-  /** Streak + weekly-target bonus XP (derived). */
+  /** Streak + weekly-target + quest bonus XP (all derived). */
   bonusXp: number;
   totalXp: number;
   rank: Rank;
@@ -315,6 +322,8 @@ export interface PlayerProgress {
   streaks: Record<string, number>;
   /** This week's progress for actions that have a weekly target. */
   weekly: Record<string, WeeklyProgress>;
+  /** Today's 3 quests. */
+  quests: TodayQuest[];
 }
 
 async function weeklyTargets(db: Db): Promise<Map<string, number | null>> {
@@ -322,31 +331,56 @@ async function weeklyTargets(db: Db): Promise<Map<string, number | null>> {
   return new Map(actions.map((a) => [a.id, a.weeklyTarget]));
 }
 
+async function questCandidates(db: Db) {
+  const actions = await db.pointAction.findMany({
+    where: { kind: "good", deletedAt: null },
+    select: { id: true, name: true, icon: true, category: true, createdAt: true, archivedAt: true },
+  });
+  return actions.map((a) => ({
+    id: a.id,
+    name: a.name,
+    icon: a.icon,
+    category: a.category,
+    createdOn: londonDateKey(a.createdAt),
+    archived: a.archivedAt !== null,
+  }));
+}
+
+/** All bonus XP by category: streaks, weekly targets and completed daily quests. */
+async function bonusByCategory(db: Db, now: Date) {
+  const [rows, targets, candidates] = await Promise.all([ledgerFacts(db), weeklyTargets(db), questCandidates(db)]);
+  const today = londonDateKey(now);
+  const streakMap = streaksByAction(rows, today, targets);
+  const byCategory = new Map<string, number>();
+  for (const s of streakMap.values()) byCategory.set(s.category, (byCategory.get(s.category) ?? 0) + s.bonusXp);
+  for (const [c, b] of questBonusByCategory(candidates, goodDaysByAction(rows), today)) {
+    byCategory.set(c, (byCategory.get(c) ?? 0) + b);
+  }
+  return { rows, targets, candidates, streakMap, byCategory, today };
+}
+
 export async function getPlayerProgress(db: Db, now = new Date()): Promise<PlayerProgress> {
-  const [rows, targets] = await Promise.all([ledgerFacts(db), weeklyTargets(db)]);
+  const { rows, targets, candidates, streakMap, byCategory, today } = await bonusByCategory(db, now);
   const baseXp = rows.reduce((n, r) => n + r.xpDelta, 0);
-  const streakMap = streaksByAction(rows, londonDateKey(now), targets);
-  let bonusXp = 0;
+  const bonusXp = [...byCategory.values()].reduce((a, b) => a + b, 0);
   const streaks: Record<string, number> = {};
   const weekly: Record<string, WeeklyProgress> = {};
-  for (const [actionId, s] of streakMap) {
-    bonusXp += s.bonusXp;
-    streaks[actionId] = s.current;
-  }
+  for (const [actionId, s] of streakMap) streaks[actionId] = s.current;
   for (const [actionId, target] of targets) {
     if (target) weekly[actionId] = { done: streakMap.get(actionId)?.thisWeek ?? 0, target };
   }
-  return { baseXp, bonusXp, totalXp: baseXp + bonusXp, rank: rankForXp(baseXp + bonusXp), streaks, weekly };
+  const doneToday = goodDaysByAction(rows);
+  // Archived actions can't be done, so they're not offered as today's quests.
+  const quests = questsForDay(candidates.filter((c) => !c.archived), today).map((q) => {
+    const c = candidates.find((x) => x.id === q.id)!;
+    return { actionId: c.id, name: c.name, icon: c.icon, done: doneToday.get(c.id)?.days.has(today) ?? false };
+  });
+  return { baseXp, bonusXp, totalXp: baseXp + bonusXp, rank: rankForXp(baseXp + bonusXp), streaks, weekly, quests };
 }
 
-/** Bonus XP (streaks + weekly targets) per action category (feeds each area's dragon). */
+/** Bonus XP (streaks, weekly targets, quests) per action category (feeds each area's dragon). */
 export async function getStreakBonusByCategory(db: Db, now = new Date()): Promise<Map<string, number>> {
-  const [rows, targets] = await Promise.all([ledgerFacts(db), weeklyTargets(db)]);
-  const out = new Map<string, number>();
-  for (const s of streaksByAction(rows, londonDateKey(now), targets).values()) {
-    out.set(s.category, (out.get(s.category) ?? 0) + s.bonusXp);
-  }
-  return out;
+  return (await bonusByCategory(db, now)).byCategory;
 }
 
 export interface LedgerItem {

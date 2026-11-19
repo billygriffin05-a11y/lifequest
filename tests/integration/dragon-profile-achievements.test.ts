@@ -21,17 +21,21 @@ const day = (d: number) => new Date(Date.UTC(2026, 10, d, 12));
 const log = (id: string, at: Date) => logAction(db, { actionId: id, idempotencyKey: randomUUID() }, at);
 
 describe("weekly targets", () => {
-  it("shows this week's progress and pays +15 when met", async () => {
+  it("shows this week's progress and pays +15 when met (plus +20 per completed daily quest)", async () => {
     const gym = await createAction(db, { name: "Gym", kind: "good", points: 10, icon: "🏋️", category: "Fitness", weeklyTarget: 3 });
+    // Pin the creation date so daily quests are deterministic (Gym is the only good action → always a quest).
+    await db.pointAction.update({ where: { id: gym.id }, data: { createdAt: day(1) } });
     await log(gym.id, day(16));
     await log(gym.id, day(18));
     let p = await getPlayerProgress(db, day(18));
     expect(p.weekly[gym.id]).toEqual({ done: 2, target: 3 });
-    expect(p.bonusXp).toBe(0);
+    expect(p.bonusXp).toBe(2 * 20); // two quests done, weekly goal not met yet
     await log(gym.id, day(19));
     p = await getPlayerProgress(db, day(19));
     expect(p.weekly[gym.id]).toEqual({ done: 3, target: 3 });
-    expect(p.bonusXp).toBe(15);
+    expect(p.bonusXp).toBe(3 * 20 + 15);
+    expect(p.quests.map((q) => q.name)).toEqual(["Gym"]);
+    expect(p.quests[0].done).toBe(true);
   });
 
   it("bad actions can't have a weekly goal", async () => {
