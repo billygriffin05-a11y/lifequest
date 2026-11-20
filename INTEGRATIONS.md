@@ -10,7 +10,7 @@ before any real account is connected.
 |---|---|---|---|
 | Google Calendar | OAuth tokens to Google; for each logged deed: its name, icon, points and time. Read requests for the owner's calendar list and events in the date range being viewed | Show deeds in a dedicated "LIFEQUEST" Google calendar; show the owner's own events (e.g. "Pay rent") in the in-app Calendar | Ledger stays in SQLite (source of truth); Google holds a copy of the deed events. Google events read back are **never stored** — memory only, ~2 minutes |
 | Open Banking provider | OAuth consent flow; API calls with access token | Read-only import of balances/transactions | Transactions stored locally; provider/bank already hold them |
-| Web Push | Encrypted notification payload via Apple/Google/Mozilla push service | Reminders on iPhone/Windows | Not stored by LIFEQUEST externally; keep payloads minimal (no amounts/health data) |
+| Web Push | Encrypted notification payload (title, short text, in-app link) via the device's push service (Apple/Google/Microsoft/Mozilla only) | Reminders you switch on: streak at risk, cards due, if-then plans, budget nearly used | Not stored externally. Payloads never include amounts or health data. VAPID keys live in `<data>/secrets/vapid.json` |
 | Recipe publishers | HTTP request for a recipe URL you choose to import | Save genuine recipe + attribution | Metadata + URL locally |
 | Tailscale | Device metadata to Tailscale coordination server; traffic is end-to-end WireGuard | Private PC↔iPhone link | Nothing |
 | GitHub | Source code only | Version control/CI | Code only — never data |

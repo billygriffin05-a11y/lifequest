@@ -14,7 +14,7 @@ import { actionInputSchema, idSchema, logInputSchema, noteInputSchema, undoInput
 import { logMomentFor } from "../rules";
 import * as service from "./service";
 
-type Field = "name" | "kind" | "points" | "icon" | "category" | "weeklyTarget";
+type Field = "name" | "kind" | "points" | "icon" | "category" | "weeklyTarget" | "cue" | "cueTime";
 
 export type FormState = {
   ok: boolean;
@@ -26,7 +26,7 @@ export type FormState = {
 
 function echoValues(formData: FormData): FormState["values"] {
   const out: FormState["values"] = {};
-  for (const key of ["name", "kind", "points", "icon", "category", "weeklyTarget"] as const) {
+  for (const key of ["name", "kind", "points", "icon", "category", "weeklyTarget", "cue", "cueTime"] as const) {
     const v = formData.get(key);
     if (typeof v === "string") out[key] = v.slice(0, 100);
   }
@@ -41,13 +41,15 @@ function readActionForm(formData: FormData) {
     icon: formData.get("icon"),
     category: formData.get("category"),
     weeklyTarget: formData.get("weeklyTarget") ?? "",
+    cue: formData.get("cue") ?? "",
+    cueTime: formData.get("cueTime") ?? "",
   });
 }
 
 function toFieldErrors(error: z.ZodError): FormState["fieldErrors"] {
   const flat = z.flattenError(error).fieldErrors as Record<string, string[] | undefined>;
   const out: FormState["fieldErrors"] = {};
-  for (const key of ["name", "kind", "points", "icon", "category", "weeklyTarget"] as const) {
+  for (const key of ["name", "kind", "points", "icon", "category", "weeklyTarget", "cue", "cueTime"] as const) {
     if (flat[key]?.[0]) out[key] = flat[key][0];
   }
   return out;

@@ -68,7 +68,14 @@ export async function createAction(db: Db, input: ActionInput) {
   const data = actionInputSchema.parse(input);
   const count = await db.pointAction.count();
   const action = await db.pointAction.create({
-    data: { ...data, weeklyTarget: data.kind === "good" ? (data.weeklyTarget ?? null) : null, sortOrder: count, updatedByDevice: DEVICE },
+    data: {
+      ...data,
+      weeklyTarget: data.kind === "good" ? (data.weeklyTarget ?? null) : null,
+      cue: data.cue ?? null,
+      cueTime: data.cue ? (data.cueTime ?? null) : null,
+      sortOrder: count,
+      updatedByDevice: DEVICE,
+    },
   });
   await db.auditEvent.create({
     data: { actor: DEVICE, action: "honour.action.create", entityType: "PointAction", entityId: action.id },
@@ -83,7 +90,14 @@ export async function updateAction(db: Db, id: string, input: ActionInput) {
   // Past entries keep their snapshot values; only future logs use the new values.
   const updated = await db.pointAction.update({
     where: { id },
-    data: { ...data, weeklyTarget: data.kind === "good" ? (data.weeklyTarget ?? null) : null, version: { increment: 1 }, updatedByDevice: DEVICE },
+    data: {
+      ...data,
+      weeklyTarget: data.kind === "good" ? (data.weeklyTarget ?? null) : null,
+      cue: data.cue ?? null,
+      cueTime: data.cue ? (data.cueTime ?? null) : null,
+      version: { increment: 1 },
+      updatedByDevice: DEVICE,
+    },
   });
   await db.auditEvent.create({
     data: { actor: DEVICE, action: "honour.action.update", entityType: "PointAction", entityId: id },
@@ -365,6 +379,8 @@ export interface PlayerProgress {
   rank: Rank;
   /** Current streak (days) per action id. */
   streaks: Record<string, number>;
+  /** Streak shields banked per action id. */
+  shields: Record<string, number>;
   /** This week's progress for actions that have a weekly target. */
   weekly: Record<string, WeeklyProgress>;
   /** Today's 3 quests. */
@@ -434,8 +450,12 @@ export async function getPlayerProgress(db: Db, now = new Date()): Promise<Playe
   const goodHonour = rows.filter((r) => r.kind === "good").reduce((n, r) => n + r.honourDelta, 0);
   const bonusXp = [...byCategory.values()].reduce((a, b) => a + b, 0) + bossWins * BOSS_XP_REWARD;
   const streaks: Record<string, number> = {};
+  const shields: Record<string, number> = {};
   const weekly: Record<string, WeeklyProgress> = {};
-  for (const [actionId, s] of streakMap) streaks[actionId] = s.current;
+  for (const [actionId, s] of streakMap) {
+    streaks[actionId] = s.current;
+    shields[actionId] = s.shields;
+  }
   for (const [actionId, target] of targets) {
     if (target) weekly[actionId] = { done: streakMap.get(actionId)?.thisWeek ?? 0, target };
   }
@@ -451,6 +471,7 @@ export async function getPlayerProgress(db: Db, now = new Date()): Promise<Playe
     totalXp: baseXp + bonusXp,
     rank: rankForXp(baseXp + bonusXp),
     streaks,
+    shields,
     weekly,
     quests,
     boss,

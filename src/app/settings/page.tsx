@@ -3,8 +3,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { CalendarCard } from "@/features/calendar/components/calendar-card";
 import { GoogleCalendarsList } from "@/features/calendar/components/google-calendars-list";
+import { NotificationsCard } from "@/features/notifications/components/notifications-card";
 
 export const metadata: Metadata = { title: "Settings · LIFEQUEST" };
+
+async function Notifications({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  return <NotificationsCard saved={sp.push === "saved"} />;
+}
 
 export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
   return (
@@ -23,6 +29,9 @@ export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
       </Suspense>
       <Suspense fallback={null}>
         <GoogleCalendarsList />
+      </Suspense>
+      <Suspense fallback={null}>
+        <Notifications searchParams={searchParams} />
       </Suspense>
     </main>
   );

@@ -118,6 +118,10 @@ model PointAction {
   sortOrder       Int          @default(0)
   /// Optional goal: times per week (Mon–Sun, Europe/London). Good actions only.
   weeklyTarget    Int?
+  /// If-then plan cue, e.g. "After my morning coffee" (implementation intention).
+  cue             String?
+  /// Optional reminder time for the plan, "HH:MM" Europe/London.
+  cueTime         String?
   archivedAt      DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -347,4 +351,22 @@ model FocusSession {
   createdAt DateTime @default(now())
 
   @@index([day])
+}
+
+// ── Push notifications (iPhone / PC home-screen app) ────────────────────────
+
+/// A browser push subscription. Endpoint is the push service URL (Apple/Google/Mozilla).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  failures  Int      @default(0)
+}
+
+/// One row per notification sent, so each reminder fires at most once per day.
+model PushLog {
+  key       String   @id
+  createdAt DateTime @default(now())
 }

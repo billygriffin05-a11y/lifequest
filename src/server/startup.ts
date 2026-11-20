@@ -62,3 +62,24 @@ async function runCalendarSync() {
   }
 }
 setInterval(runCalendarSync, 5 * 60 * 1000).unref();
+
+// Push reminders (streak at risk, cards due, budgets, if-then plans).
+// Every minute; returns immediately until a device has turned notifications on.
+async function runPushReminders() {
+  try {
+    const [{ runReminders }, { createPrismaClient }] = await Promise.all([
+      import("@/features/notifications/server/runner"),
+      import("./db/factory"),
+    ]);
+    const db = createPrismaClient(paths.dbFile);
+    try {
+      const r = await runReminders(db, paths);
+      if (r.sent) console.info(`[lifequest] push reminders: ${r.sent} sent`);
+    } finally {
+      await db.$disconnect();
+    }
+  } catch {
+    console.error("[lifequest] push reminders failed");
+  }
+}
+setInterval(runPushReminders, 60 * 1000).unref();
