@@ -4,7 +4,7 @@ import { getDragons } from "@/features/dragons/server/service";
 import { prisma } from "@/server/db/client";
 import { QUEST_BONUS } from "../progress";
 import { LIFEQUEST_TIME_ZONE, logMomentFor } from "../rules";
-import { addStarterActionsAction, setArchivedAction } from "../server/actions";
+import { addStarterActionsAction, moveActionAction, setArchivedAction } from "../server/actions";
 import {
   getDailyTrend,
   getLoggedTodayActionIds,
@@ -292,9 +292,28 @@ export async function HonourBoard({
         </div>
         {all.length > 0 && (
           <ul className="mt-4 grid gap-2">
-            {all.map((a) => (
-              <li key={a.id} className="rounded-xl border border-obsidian-700 p-3">
+            {all.map((a, i) => (
+              <li key={a.id} className="rounded-xl border border-obsidian-700 p-3" data-testid="manage-action">
                 <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-col">
+                    {(["up", "down"] as const).map((dir) => {
+                      const disabled = dir === "up" ? i === 0 : i === all.length - 1;
+                      return (
+                        <form key={dir} action={moveActionAction}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="direction" value={dir} />
+                          <button
+                            type="submit"
+                            disabled={disabled}
+                            aria-label={`Move ${a.name} ${dir}`}
+                            className="min-h-11 min-w-11 rounded-md text-silver-300 hover:text-gold-300 disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-emerald-400"
+                          >
+                            {dir === "up" ? "▲" : "▼"}
+                          </button>
+                        </form>
+                      );
+                    })}
+                  </div>
                   <span aria-hidden="true" className="text-xl">
                     {a.icon}
                   </span>

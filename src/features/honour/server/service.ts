@@ -109,6 +109,26 @@ export async function setArchived(db: Db, id: string, archived: boolean, now = n
   return updated;
 }
 
+/**
+ * Move an action one place up or down. Renumbers every action 0..n-1 first so
+ * old duplicate sortOrder values (e.g. all 0) still reorder predictably.
+ */
+export async function moveAction(db: Db, id: string, direction: "up" | "down") {
+  const all = await db.pointAction.findMany({
+    where: { deletedAt: null },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+  const i = all.findIndex((a) => a.id === id);
+  if (i === -1) throw new HonourError("Action not found", "NOT_FOUND");
+  const j = direction === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= all.length) return false;
+  [all[i], all[j]] = [all[j], all[i]];
+  await db.$transaction(all.map((a, n) => db.pointAction.update({ where: { id: a.id }, data: { sortOrder: n } })));
+  await db.auditEvent.create({ data: { actor: DEVICE, action: "honour.action.move", entityType: "PointAction", entityId: id } });
+  return true;
+}
+
 /** Adds the starter examples, but only when the user has no actions yet. */
 export async function addStarterActions(db: Db): Promise<number> {
   if ((await db.pointAction.count()) > 0) return 0;
