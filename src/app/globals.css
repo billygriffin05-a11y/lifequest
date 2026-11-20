@@ -160,6 +160,61 @@
   animation: lq-float 3.3s ease-in-out infinite;
 }
 
+/* Mood motion for the whole dragon (feet stay planted at the ground line). */
+.lq-mood {
+  transform-box: view-box;
+  transform-origin: 28px 37px;
+}
+@keyframes lq-mood-joyful {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  15% { transform: translateY(0) scale(1.04, 0.95); }
+  45% { transform: translateY(-2.5px) scale(0.98, 1.03); }
+  70% { transform: translateY(0) scale(1.03, 0.97); }
+}
+.lq-mood-joyful {
+  animation: lq-mood-joyful 1.1s ease-in-out infinite;
+}
+.lq-mood-joyful .lq-float {
+  animation-duration: 2s;
+}
+.lq-mood-joyful .lq-breath {
+  animation-duration: 0.8s;
+}
+@keyframes lq-mood-content {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-1.2deg); }
+}
+.lq-mood-content {
+  animation: lq-mood-content 4.5s ease-in-out infinite;
+}
+@keyframes lq-mood-restless {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-1.5px) rotate(1deg); }
+  40% { transform: translateX(-1.5px) rotate(-0.5deg); }
+  60% { transform: translateX(1.5px) rotate(-1deg); }
+  80% { transform: translateX(1.5px) rotate(0.5deg); }
+}
+.lq-mood-restless {
+  animation: lq-mood-restless 2.6s ease-in-out infinite;
+}
+.lq-mood-restless .lq-blink {
+  animation-duration: 1.7s;
+}
+@keyframes lq-mood-grumpy {
+  0%, 70%, 100% { transform: translateX(0) translateY(0.4px); }
+  74% { transform: translateX(-0.8px) translateY(0.4px); }
+  78% { transform: translateX(0.8px) translateY(0.4px); }
+  82% { transform: translateX(-0.8px) translateY(0.4px); }
+  86% { transform: translateX(0.6px) translateY(0.4px); }
+  90% { transform: translateX(0) translateY(0.4px); }
+}
+.lq-mood-grumpy {
+  animation: lq-mood-grumpy 3.2s ease-in-out infinite;
+}
+.lq-mood-grumpy .lq-breath {
+  animation-duration: 3.2s;
+}
+
 body {
   background-color: var(--color-obsidian-950);
   color: var(--color-silver-100);
@@ -182,7 +237,8 @@ body {
   .lq-breathe,
   .lq-blink,
   .lq-breath,
-  .lq-float {
+  .lq-float,
+  .lq-mood {
     animation: none !important;
   }
 }

@@ -58,3 +58,19 @@ for (const path of ["/dragons", "/dragons/gallery"]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   });
 }
+
+test("each dragon has its own design text and a mood animation", async ({ page }) => {
+  await page.goto("/dragons/nutrition");
+  await expect(page.getByTestId("dragon-look")).toContainText("club tail");
+  const mood = page.locator("svg [data-mood]").first();
+  await expect(mood).toHaveAttribute("class", /lq-mood lq-mood-(joyful|content|restless|grumpy)/);
+  await page.goto("/dragons/habits");
+  await expect(page.getByTestId("dragon-look")).toContainText("feathered wings");
+});
+
+test("mood animation is switched off for reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/dragons/fitness");
+  const name = await page.locator("svg [data-mood]").first().evaluate((el) => getComputedStyle(el).animationName);
+  expect(name).toBe("none");
+});

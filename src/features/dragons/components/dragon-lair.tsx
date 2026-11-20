@@ -8,7 +8,7 @@ import { DragonSprite } from "./dragon-sprite";
 const num = new Intl.NumberFormat("en-GB");
 
 const moodStyle = {
-  joyful: { chip: "border-gold-500/50 text-gold-300", sprite: "lq-hop" },
+  joyful: { chip: "border-gold-500/50 text-gold-300", sprite: "" },
   content: { chip: "border-emerald-500/50 text-emerald-300", sprite: "" },
   restless: { chip: "border-silver-500/50 text-silver-300", sprite: "opacity-80" },
   grumpy: { chip: "border-ember-500/50 text-ember-300", sprite: "saturate-50 brightness-90" },
