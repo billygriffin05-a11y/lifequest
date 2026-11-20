@@ -30,7 +30,10 @@ test("calendar switches between month, week and day", async ({ page }) => {
   await expect(page.getByTestId("period-title")).toContainText("–");
   expect((await axe(page)).violations).toEqual([]);
   expect(await noSideScroll(page)).toBe(false);
+  const weekTitle = await page.getByTestId("period-title").textContent();
   await page.getByRole("link", { name: "Next week" }).click();
+  // Wait for the new week to load before moving on (the old page also has "Back to today").
+  await expect(page.getByTestId("period-title")).not.toHaveText(weekTitle ?? "");
   await expect(page.getByRole("link", { name: "Back to today" })).toBeVisible();
 
   await page.goto("/calendar?view=month&d=2025-12-01");
