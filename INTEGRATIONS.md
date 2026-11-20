@@ -8,7 +8,7 @@ before any real account is connected.
 
 | Integration | What leaves the PC | Why | Stored where permanently |
 |---|---|---|---|
-| Google Calendar | OAuth tokens to Google; for each logged deed: its name, icon, points and time | Show deeds in a dedicated "LIFEQUEST" Google calendar | Ledger stays in SQLite (source of truth); Google holds a copy of the events |
+| Google Calendar | OAuth tokens to Google; for each logged deed: its name, icon, points and time. Read requests for the owner's calendar list and events in the date range being viewed | Show deeds in a dedicated "LIFEQUEST" Google calendar; show the owner's own events (e.g. "Pay rent") in the in-app Calendar | Ledger stays in SQLite (source of truth); Google holds a copy of the deed events. Google events read back are **never stored** — memory only, ~2 minutes |
 | Open Banking provider | OAuth consent flow; API calls with access token | Read-only import of balances/transactions | Transactions stored locally; provider/bank already hold them |
 | Web Push | Encrypted notification payload via Apple/Google/Mozilla push service | Reminders on iPhone/Windows | Not stored by LIFEQUEST externally; keep payloads minimal (no amounts/health data) |
 | Recipe publishers | HTTP request for a recipe URL you choose to import | Save genuine recipe + attribution | Metadata + URL locally |
@@ -19,15 +19,21 @@ Anything not on this list must not send personal data off the PC without an upda
 
 ## Google Calendar
 
-**Implemented (one-way push):** `src/features/calendar`, `/settings`, `/api/integrations/google/{start,callback}`.
-- Scope: **`calendar.app.created` only** — LIFEQUEST can manage the "LIFEQUEST" calendar it creates and nothing else.
+**Implemented:** push deeds to Google, and read the owner's events for display. `src/features/calendar`, `/calendar`,
+`/settings`, `/api/integrations/google/{start,callback}`. See `docs/adr/0002-google-calendar-read-access.md`.
+- Scopes: **`calendar.app.created`** (write only to the "LIFEQUEST" calendar it creates) +
+  **`calendar.calendarlist.readonly`** + **`calendar.events.readonly`** (read the owner's other calendars to display them).
+  LIFEQUEST never creates, edits or deletes the owner's own events.
+- Reading: `server/google-events.ts` lists the calendars shown in Google (skipping LIFEQUEST's own and hidden ones) and
+  fetches events for the visible range with recurring events expanded. Results live in an in-memory cache for 2 minutes,
+  never in the database or logs. Connections made before read access existed get a 403 → the UI asks to **Re-link**.
 - OAuth: authorization code + PKCE + `state` (HttpOnly cookies, 10-minute life); callback only reports fixed result codes.
 - Tokens: AES-256-GCM encrypted in the `GoogleConnection` table; key in `%LOCALAPPDATA%\LIFEQUEST\secrets\token.key`.
 - Sync: logging/undoing a deed queues a `CalendarOutbox` item; it's pushed right after the request (`after()`), retried
   every 5 minutes, and given up after 8 attempts (shown on `/settings`). Event ids are derived from the entry id, so
   retries never duplicate events. Logging never waits on, or fails because of, Google.
 - Unlink revokes the token at Google and forgets it locally; existing events stay in the owner's Google calendar.
-- Not yet: reading Google events into LIFEQUEST (two-way sync) — the design below still applies when that's added.
+- Not yet: storing/syncing Google events locally (two-way sync) — the design below still applies if that's added.
 
 Original design notes:
 
