@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ICONS } from "@/components/ui/pixel-icon";
 
-const ALLOWED = new Set([..."akbcmdefsgvh."]);
+const ALLOWED = new Set([..."akbcmdefsgvhp."]);
 
 describe("pixel icons", () => {
   it("are all 12×12 and only use theme colour letters", () => {

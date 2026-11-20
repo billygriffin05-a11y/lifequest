@@ -7,9 +7,9 @@
 export const CHART = {
   good: "#1aa58f",
   bad: "#e05a2b",
-  grid: "#1a2742",
-  ink: "#b9c8e2",
-  inkStrong: "#e8f1ff",
-  hair: "#7f90b4",
-  surface: "#0a0f1c",
+  grid: "#2c1a59",
+  ink: "#cdc2f0",
+  inkStrong: "#f3edff",
+  hair: "#9387c4",
+  surface: "#150b29",
 } as const;

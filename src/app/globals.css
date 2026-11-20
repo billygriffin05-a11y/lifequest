@@ -1,33 +1,39 @@
 @import "tailwindcss";
 
 /*
- * LIFEQUEST design tokens — dark futuristic: deep space-navy "obsidian",
- * neon-teal "emerald" (progress/success), bright amber "gold" (rewards,
- * headings) and cool blue-white "silver" text. Token names are kept so every
- * component re-themes at once. Use tokens (bg-obsidian-900, text-gold-300,
- * border-emerald-500/40) instead of raw hex values.
+ * LIFEQUEST design tokens — neon cyberpunk pixel city: deep purple night
+ * ("obsidian"), neon aqua ("emerald": progress/success), hot magenta ("gold":
+ * headings, primary actions, rewards), warm sign yellow ("amber": coins,
+ * icons), lavender-white text ("silver") and a violet glow. Token names are
+ * kept so every component re-themes at once. No raw hex in components.
  * Contrast: body text on obsidian must stay >= 4.5:1 (WCAG AA).
  */
 @theme {
-  --color-obsidian-950: #04060d;
-  --color-obsidian-900: #0a0f1c;
-  --color-obsidian-800: #111a2e;
-  --color-obsidian-700: #1a2742;
-  --color-obsidian-600: #283a5e;
+  --color-obsidian-950: #0c0618;
+  --color-obsidian-900: #150b29;
+  --color-obsidian-800: #1f1240;
+  --color-obsidian-700: #2c1a59;
+  --color-obsidian-600: #42297d;
 
-  --color-emerald-300: #6ff7e4;
-  --color-emerald-400: #2ee6cf;
-  --color-emerald-500: #12c2ab;
-  --color-emerald-700: #0a7a6c;
+  --color-emerald-300: #8dffe0;
+  --color-emerald-400: #3ef5c4;
+  --color-emerald-500: #15d6a4;
+  --color-emerald-700: #0b7d62;
 
-  --color-gold-300: #ffe08a;
-  --color-gold-400: #ffd04d;
-  --color-gold-500: #f5b800;
-  --color-gold-700: #a67c00;
+  --color-gold-300: #ffa6f0;
+  --color-gold-400: #ff64e1;
+  --color-gold-500: #ff2bd1;
+  --color-gold-700: #a3168a;
 
-  /* Violet: futuristic glow accents (background haze, focus flourishes). */
-  --color-violet-400: #a78bfa;
-  --color-violet-600: #6d4fd8;
+  /* Amber: neon sign yellow (coins, pixel icons). */
+  --color-amber-300: #ffe58a;
+  --color-amber-400: #ffd23f;
+  --color-amber-500: #f7b500;
+  --color-amber-700: #a67a00;
+
+  /* Violet: background glow accents. */
+  --color-violet-400: #8b6dff;
+  --color-violet-600: #5a35d6;
 
   /* Ember: bad habits / penalties. */
   --color-ember-300: #f6a7a0;
@@ -35,11 +41,16 @@
   --color-ember-500: #d9534a;
   --color-ember-700: #8e2a23;
 
-  --color-silver-100: #e8f1ff;
-  --color-silver-300: #b9c8e2;
-  --color-silver-500: #7f90b4;
+  --color-silver-100: #f3edff;
+  --color-silver-300: #cdc2f0;
+  --color-silver-500: #9387c4;
 
-  --font-display: var(--font-orbitron), "Segoe UI", system-ui, sans-serif;
+  /* Squarer corners for a pixel-art feel. */
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.375rem;
+  --radius-2xl: 0.5rem;
+
+  --font-display: var(--font-pixel), "Segoe UI", system-ui, sans-serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
 }
 
@@ -251,30 +262,28 @@ html {
 }
 
 body {
-  background-color: var(--color-obsidian-950);
+  /* Transparent so the neon city (fixed, behind) shows; <html> carries the base colour. */
+  background-color: transparent;
   color: var(--color-silver-100);
   font-family: var(--font-sans);
 }
 
-/* Futuristic backdrop: soft neon haze + a faint grid, fixed behind everything. */
-body::before {
+/* CRT-style scanlines over the neon city backdrop (see components/ui/neon-city.tsx). */
+body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    radial-gradient(60rem 40rem at 10% -10%, color-mix(in oklab, var(--color-emerald-400) 14%, transparent), transparent 70%),
-    radial-gradient(50rem 40rem at 110% 110%, color-mix(in oklab, var(--color-violet-600) 22%, transparent), transparent 70%),
-    linear-gradient(color-mix(in oklab, var(--color-emerald-400) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in oklab, var(--color-emerald-400) 6%, transparent) 1px, transparent 1px);
-  background-size: auto, auto, 40px 40px, 40px 40px;
+  background: repeating-linear-gradient(to bottom, color-mix(in oklab, var(--color-obsidian-950) 35%, transparent) 0 1px, transparent 1px 3px);
 }
 
-/* Headings get a faint neon glow in the futuristic display face. */
+/* Headings glow like neon signs in the pixel display face. */
 .font-display {
-  letter-spacing: 0.04em;
-  text-shadow: 0 0 18px color-mix(in oklab, currentColor 35%, transparent);
+  letter-spacing: 0.03em;
+  text-shadow:
+    0 0 6px color-mix(in oklab, currentColor 55%, transparent),
+    0 0 22px color-mix(in oklab, currentColor 35%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

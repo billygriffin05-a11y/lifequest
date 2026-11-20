@@ -6,9 +6,9 @@
 
 /** Pixel letter → Tailwind fill class (kept literal so Tailwind generates them). */
 const FILLS = {
-  a: "fill-gold-400",
-  k: "fill-gold-300",
-  b: "fill-gold-700",
+  a: "fill-amber-400",
+  k: "fill-amber-300",
+  b: "fill-amber-700",
   c: "fill-emerald-400",
   m: "fill-emerald-300",
   d: "fill-emerald-700",
@@ -17,6 +17,7 @@ const FILLS = {
   s: "fill-silver-500",
   g: "fill-ember-400",
   v: "fill-violet-400",
+  p: "fill-gold-400",
   h: "fill-obsidian-600",
 } as const;
 
