@@ -47,6 +47,8 @@ export function DragonSprite({ stage, mood, element, palette, label, className, 
   const calm = mood === "grumpy" || mood === "restless";
   return (
     <svg viewBox={`0 0 ${GRID_W} ${GRID_H}`} shapeRendering="crispEdges" role="img" aria-label={label} className={className}>
+      {/* Whole-body mood motion: joyful bounces, content sways, restless paces, grumpy huffs. */}
+      <g className={animate ? `lq-mood lq-mood-${mood}` : undefined} data-mood={mood}>
       {l.wing.length > 0 && l.wingOrigin && (
         <g className={animate && !calm ? (mood === "joyful" ? "lq-flap lq-fast" : "lq-flap") : undefined} style={origin(l.wingOrigin)}>
           <Runs runs={l.wing} palette={palette} />
@@ -71,6 +73,7 @@ export function DragonSprite({ stage, mood, element, palette, label, className, 
           <Runs runs={m.runs} palette={palette} />
         </g>
       ))}
+      </g>
     </svg>
   );
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { PLANS } from "@/features/dragons/body-plans";
 import { DragonSprite } from "@/features/dragons/components/dragon-sprite";
 import { RenameForm } from "@/features/dragons/components/rename-form";
 import { MOOD_HINT, MOOD_TEXT, STAGE_COUNT } from "@/features/dragons/rules";
@@ -32,6 +33,9 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
         <p className="mt-1 text-silver-300">
           {dragon.area.elementName} dragon of {dragon.area.name}
           {dragon.customName && <span className="text-silver-500"> · born {dragon.area.dragonName}</span>}
+        </p>
+        <p className="mt-1 text-sm text-silver-300" data-testid="dragon-look">
+          {PLANS[dragon.area.element].look}
         </p>
       </header>
 
