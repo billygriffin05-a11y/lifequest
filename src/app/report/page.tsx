@@ -200,7 +200,7 @@ async function Report({ searchParams }: { searchParams: Promise<Record<string, s
 
 export default function ReportPage({ searchParams }: PageProps<"/report">) {
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← LIFEQUEST

@@ -294,7 +294,7 @@ async function CalendarView({ searchParams }: { searchParams: Promise<Record<str
 
 export default function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="-mx-4 flex gap-x-5 overflow-x-auto whitespace-nowrap px-4 text-sm [scrollbar-width:none]">
         <Link href="/" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← LIFEQUEST

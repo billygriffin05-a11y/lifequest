@@ -157,7 +157,7 @@ async function Cards({ searchParams }: { searchParams: Promise<Record<string, st
 
 export default function CardsPage({ searchParams }: PageProps<"/mind/cards">) {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="-mx-4 flex gap-x-5 overflow-x-auto whitespace-nowrap px-4 text-sm [scrollbar-width:none]">
         <Link href="/mind" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← Mind
