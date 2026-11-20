@@ -20,7 +20,7 @@ export async function HomeHero() {
       <Link
         href={`/dragons/${dragon.area.id}`}
         className="block rounded-2xl border border-obsidian-600 p-2 focus-visible:outline-2 focus-visible:outline-emerald-400"
-        style={{ background: `radial-gradient(ellipse at 45% 65%, ${dragon.area.palette.breathOuter}40, transparent 70%), #07080a` }}
+        style={{ background: `radial-gradient(ellipse at 45% 65%, ${dragon.area.palette.breathOuter}40, transparent 70%), var(--color-obsidian-950)` }}
       >
         <DragonSprite
           stage={dragon.growth.stage}
