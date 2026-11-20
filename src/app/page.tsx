@@ -13,7 +13,7 @@ const AREAS = [
   { href: "/report", icon: "📜", label: "Weekly report" },
   { href: "/shop", icon: "🪙", label: "Shop" },
   { href: "/achievements", icon: "🏆", label: "Achievements" },
-  { href: "/honour/history", icon: "🗓️", label: "Heatmap" },
+  { href: "/calendar", icon: "📅", label: "Calendar" },
   { href: "/settings", icon: "⚙️", label: "Settings" },
 ] as const;
 

@@ -102,8 +102,8 @@ async function Shop({ searchParams }: { searchParams: Promise<Record<string, str
 
 export default function ShopPage({ searchParams }: PageProps<"/shop">) {
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
-      <nav aria-label="Breadcrumb" className="flex flex-wrap gap-x-6 text-sm">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+      <nav aria-label="Breadcrumb" className="-mx-4 flex gap-x-5 overflow-x-auto whitespace-nowrap px-4 text-sm [scrollbar-width:none]">
         <Link href="/" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← LIFEQUEST
         </Link>
