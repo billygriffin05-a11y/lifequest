@@ -47,10 +47,20 @@ export function DragonSprite({ stage, mood, element, palette, label, className, 
   const calm = mood === "grumpy" || mood === "restless";
   return (
     <svg viewBox={`0 0 ${GRID_W} ${GRID_H}`} shapeRendering="crispEdges" role="img" aria-label={label} className={className}>
+      {l.shadow.length > 0 && (
+        <g className={animate ? "lq-shadow" : undefined} data-testid="dragon-shadow">
+          <Runs runs={l.shadow} palette={palette} />
+        </g>
+      )}
+      {/* Flying dragons bob in the air; mood motion plays on top. */}
+      <g className={animate && l.flying ? "lq-hover" : undefined} data-flying={l.flying || undefined}>
       {/* Whole-body mood motion: joyful bounces, content sways, restless paces, grumpy huffs. */}
       <g className={animate ? `lq-mood lq-mood-${mood}` : undefined} data-mood={mood}>
       {l.wing.length > 0 && l.wingOrigin && (
-        <g className={animate && !calm ? (mood === "joyful" ? "lq-flap lq-fast" : "lq-flap") : undefined} style={origin(l.wingOrigin)}>
+        <g
+          className={animate && (!calm || l.flying) ? (mood === "joyful" ? "lq-flap lq-fast" : l.flying ? "lq-flap lq-soar" : "lq-flap") : undefined}
+          style={origin(l.wingOrigin)}
+        >
           <Runs runs={l.wing} palette={palette} />
         </g>
       )}
@@ -73,6 +83,7 @@ export function DragonSprite({ stage, mood, element, palette, label, className, 
           <Runs runs={m.runs} palette={palette} />
         </g>
       ))}
+      </g>
       </g>
     </svg>
   );

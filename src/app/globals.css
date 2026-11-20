@@ -160,6 +160,30 @@
   animation: lq-float 3.3s ease-in-out infinite;
 }
 
+/* Flying dragons hover; their ground shadow shrinks as they rise. */
+.lq-hover,
+.lq-shadow {
+  transform-box: view-box;
+  transform-origin: 28px 37px;
+}
+@keyframes lq-hover {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.8px); }
+}
+.lq-hover {
+  animation: lq-hover 2.4s ease-in-out infinite;
+}
+@keyframes lq-shadow {
+  0%, 100% { transform: scaleX(1); opacity: 0.9; }
+  50% { transform: scaleX(0.82); opacity: 0.6; }
+}
+.lq-shadow {
+  animation: lq-shadow 2.4s ease-in-out infinite;
+}
+.lq-flap.lq-soar {
+  animation-duration: 1.3s;
+}
+
 /* Mood motion for the whole dragon (feet stay planted at the ground line). */
 .lq-mood {
   transform-box: view-box;
@@ -238,7 +262,9 @@ body {
   .lq-blink,
   .lq-breath,
   .lq-float,
-  .lq-mood {
+  .lq-mood,
+  .lq-hover,
+  .lq-shadow {
     animation: none !important;
   }
 }

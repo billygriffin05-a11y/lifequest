@@ -20,7 +20,7 @@ export default function DragonGalleryPage() {
       </nav>
       <h1 className="font-display text-4xl font-bold tracking-wide text-gold-300">Dragon Art Gallery</h1>
       <p className="mt-2 max-w-2xl text-silver-300">
-        Eight elemental dragons across all {STAGES.length} stages — wings, breath, spines and crowns unlock as they grow.
+        Eight elemental dragons across all {STAGES.length} stages — wings, breath, spines and regal armour unlock as they grow, and the oldest take flight.
       </p>
 
       {AREAS.map((area) => (
@@ -41,7 +41,6 @@ export default function DragonGalleryPage() {
                   palette={area.palette}
                   label={`${area.dragonName} stage ${i + 1}: ${stage.name}`}
                   className="aspect-[7/5] w-full"
-                  animate={false}
                 />
                 <span className="block truncate text-[0.65rem] text-silver-300">
                   {i + 1}. {stage.name}

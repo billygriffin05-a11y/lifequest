@@ -48,8 +48,11 @@ export const UNLOCKS = {
   fangs: 12,
   twinHorns: 13,
   crest: 15,
+  /** Ancient: bigger horns, neck and cheek spikes, larger back armour. */
+  regal: 15,
+  /** Primordial: takes to the sky. */
+  flight: 17,
   aura: 18,
-  crown: 19,
 } as const;
 
 export interface Growth {
