@@ -103,6 +103,19 @@ export async function setArchivedAction(formData: FormData): Promise<void> {
   refresh();
 }
 
+export async function moveActionAction(formData: FormData): Promise<void> {
+  const id = idSchema.safeParse(formData.get("id"));
+  const direction = formData.get("direction") === "up" ? "up" : "down";
+  if (!id.success) return;
+  try {
+    await service.moveAction(prisma, id.data, direction);
+  } catch (err) {
+    failure(err);
+    return;
+  }
+  refresh();
+}
+
 export async function addStarterActionsAction(): Promise<void> {
   await service.addStarterActions(prisma);
   refresh();

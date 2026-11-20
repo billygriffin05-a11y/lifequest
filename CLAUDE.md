@@ -28,7 +28,14 @@ Environment setup is complete. Built so far:
   (`sprite.ts`, layered + CSS-animated, off under reduced motion) — Codex image generation was not available on the
   owner's account. Keep this approach unless the owner asks otherwise.
 
-Do not start other domains (finance, fitness, nutrition, etc.) unless the user has started that phase.
+- **30-feature roadmap** (`docs/ROADMAP.md`, all ✅): quests, heatmap, CSV export, gold shop, weekly boss; **Money**
+  (`src/features/finance`, `/money`: budgets, spending, savings, bank CSV import, budget XP); **Body**
+  (`src/features/body`, `/body`); **Mind** (`src/features/mind`, `/mind`, `/mind/cards`: reading, Security+ Leitner cards,
+  mood/journal, focus timer); **Polish**: `/report`, `/search`, action reorder, home dashboard, offline service worker
+  (`public/sw.js` — never caches page HTML or API responses, only `/offline` and static assets).
+- Area rewards are **derived** bonus XP merged in `bonusByCategory` (honour service). Mood is never scored.
+
+Do not start new domains beyond these unless the user asks.
 
 ## 3. Stack
 

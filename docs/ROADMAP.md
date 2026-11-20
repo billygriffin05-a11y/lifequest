@@ -38,10 +38,10 @@ Built in batches of five, each with tests and its own PR. Status: ⬜ planned ·
 25. ✅ **Focus timer** (Pomodoro) that logs study time.
 
 ## Batch 6 — Polish
-26. ⬜ **Weekly report** page — wins, misses, streaks, dragons.
-27. ⬜ **Search & filter** actions and history.
-28. ⬜ **Reorder actions** (move up/down).
-29. ⬜ **Offline app shell** (PWA service worker) for iPhone/PC.
-30. ⬜ **Home dashboard** — today's quests, streaks, favourite dragon, reminders.
+26. ✅ **Weekly report** page — wins, misses, streaks, dragons.
+27. ✅ **Search & filter** actions and history.
+28. ✅ **Reorder actions** (move up/down).
+29. ✅ **Offline app shell** (PWA service worker) for iPhone/PC.
+30. ✅ **Home dashboard** — today's quests, streaks, favourite dragon, reminders.
 
 Bigger items still separate: iPhone sync with the PC (device pairing + Tailscale), Open Banking connection.
