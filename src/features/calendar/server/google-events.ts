@@ -24,6 +24,57 @@ export function clearGoogleEventsCache() {
   cache.clear();
 }
 
+export interface CalendarOverviewRow {
+  name: string;
+  colour: string | null;
+  primary: boolean;
+  /** Shown in the in-app calendar? */
+  included: boolean;
+  /** Why not, when not. */
+  reason: "lifequest" | "hidden" | null;
+  /** Events Google returned for the range (null when not read). */
+  events: number | null;
+}
+
+export type CalendarOverview =
+  | { status: "ok"; calendars: CalendarOverviewRow[] }
+  | { status: "not-configured" | "not-linked" | "needs-relink" | "error"; calendars: [] };
+
+/**
+ * Which of the owner's Google calendars LIFEQUEST can see, and how many events
+ * each has in a range — so the owner can tell why something isn't showing.
+ * Names only; nothing is stored or logged.
+ */
+export async function getCalendarOverview(deps: CalendarDeps, from: string, to: string): Promise<CalendarOverview> {
+  if (!deps.cfg) return { status: "not-configured", calendars: [] };
+  const row = await deps.db.googleConnection.findUnique({ where: { id: "google" } });
+  if (!row) return { status: "not-linked", calendars: [] };
+  try {
+    const token = await getAccessToken(deps);
+    const all = await listCalendars(deps.fetchImpl, token);
+    const calendars = await Promise.all(
+      all.map(async (c): Promise<CalendarOverviewRow> => {
+        const reason = c.id === row.calendarId ? "lifequest" : c.selected === false || c.hidden ? "hidden" : null;
+        const events = reason ? null : (await listEvents(deps.fetchImpl, token, c.id, utcStartOf(from, -1), utcStartOf(to, 2))).length;
+        return {
+          name: c.summaryOverride ?? c.summary ?? "Calendar",
+          colour: safeColour(c.backgroundColor),
+          primary: Boolean(c.primary),
+          included: reason === null,
+          reason,
+          events,
+        };
+      }),
+    );
+    calendars.sort((a, b) => Number(b.primary) - Number(a.primary) || a.name.localeCompare(b.name));
+    return { status: "ok", calendars };
+  } catch (err) {
+    if (err instanceof GoogleApiError && (err.status === 403 || err.status === 401)) return { status: "needs-relink", calendars: [] };
+    console.error("[calendar] could not read Google calendar list");
+    return { status: "error", calendars: [] };
+  }
+}
+
 export async function getGoogleEvents(deps: CalendarDeps, from: string, to: string): Promise<GoogleEventsResult> {
   if (!deps.cfg) return { status: "not-configured", events: [] };
   const row = await deps.db.googleConnection.findUnique({ where: { id: "google" } });
