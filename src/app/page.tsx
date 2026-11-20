@@ -1,21 +1,22 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { TodayPanel } from "@/features/dashboard/components/today-panel";
+import { PixelIcon, type IconName } from "@/components/ui/pixel-icon";
 import { HomeRank } from "@/features/honour/components/home-rank";
 import { HomeHero } from "@/features/treasury/components/home-hero";
 
-const AREAS = [
-  { href: "/honour", icon: "⚖️", label: "Honour" },
-  { href: "/dragons", icon: "🐉", label: "Dragons" },
-  { href: "/money", icon: "💷", label: "Money" },
-  { href: "/body", icon: "💪", label: "Body" },
-  { href: "/mind", icon: "🧠", label: "Mind" },
-  { href: "/report", icon: "📜", label: "Weekly report" },
-  { href: "/shop", icon: "🪙", label: "Shop" },
-  { href: "/achievements", icon: "🏆", label: "Achievements" },
-  { href: "/calendar", icon: "📅", label: "Calendar" },
-  { href: "/settings", icon: "⚙️", label: "Settings" },
-] as const;
+const AREAS: { href: string; icon: IconName; label: string }[] = [
+  { href: "/honour", icon: "honour", label: "Honour" },
+  { href: "/dragons", icon: "dragons", label: "Dragons" },
+  { href: "/money", icon: "money", label: "Money" },
+  { href: "/body", icon: "body", label: "Body" },
+  { href: "/mind", icon: "mind", label: "Mind" },
+  { href: "/report", icon: "report", label: "Weekly report" },
+  { href: "/shop", icon: "shop", label: "Shop" },
+  { href: "/achievements", icon: "achievements", label: "Achievements" },
+  { href: "/calendar", icon: "calendar", label: "Calendar" },
+  { href: "/settings", icon: "settings", label: "Settings" },
+];
 
 export default function Home() {
   return (
@@ -35,7 +36,11 @@ export default function Home() {
             placeholder="Search actions, notes, spending, books…"
             className="block min-h-11 w-full rounded-lg border border-obsidian-600 bg-obsidian-950 px-3 text-silver-100 placeholder:text-silver-500 focus-visible:outline-2 focus-visible:outline-emerald-400"
           />
-          <button type="submit" className="min-h-11 rounded-lg border border-gold-500/50 px-4 text-sm font-semibold text-gold-300 hover:bg-gold-500/10">
+          <button
+            type="submit"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/50 px-4 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/10"
+          >
+            <PixelIcon name="search" className="h-4 w-4" />
             Search
           </button>
         </form>
@@ -52,11 +57,9 @@ export default function Home() {
               <li key={a.href}>
                 <Link
                   href={a.href}
-                  className="flex min-h-16 flex-col items-center justify-center rounded-xl border border-obsidian-600 bg-obsidian-950/60 px-2 py-2 text-sm text-silver-100 hover:border-gold-400 hover:text-gold-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                  className="group flex min-h-20 flex-col items-center justify-center gap-1.5 rounded-xl border border-obsidian-600 bg-obsidian-950/60 px-2 py-2 text-sm text-silver-100 transition-transform hover:-translate-y-0.5 hover:border-emerald-400 hover:text-emerald-300 hover:shadow-[0_0_18px_-6px_var(--color-emerald-400)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                 >
-                  <span aria-hidden="true" className="text-xl">
-                    {a.icon}
-                  </span>
+                  <PixelIcon name={a.icon} className="h-8 w-8" />
                   {a.label}
                 </Link>
               </li>

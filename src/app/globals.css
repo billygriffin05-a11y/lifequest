@@ -1,27 +1,33 @@
 @import "tailwindcss";
 
 /*
- * LIFEQUEST design tokens — dark fantasy: obsidian backgrounds with emerald,
- * gold and silver accents. Use these tokens (e.g. bg-obsidian-900,
- * text-gold-400, border-emerald-500/40) instead of raw hex values.
+ * LIFEQUEST design tokens — dark futuristic: deep space-navy "obsidian",
+ * neon-teal "emerald" (progress/success), bright amber "gold" (rewards,
+ * headings) and cool blue-white "silver" text. Token names are kept so every
+ * component re-themes at once. Use tokens (bg-obsidian-900, text-gold-300,
+ * border-emerald-500/40) instead of raw hex values.
  * Contrast: body text on obsidian must stay >= 4.5:1 (WCAG AA).
  */
 @theme {
-  --color-obsidian-950: #07080a;
-  --color-obsidian-900: #0d0f12;
-  --color-obsidian-800: #151920;
-  --color-obsidian-700: #1f2530;
-  --color-obsidian-600: #2b3341;
+  --color-obsidian-950: #04060d;
+  --color-obsidian-900: #0a0f1c;
+  --color-obsidian-800: #111a2e;
+  --color-obsidian-700: #1a2742;
+  --color-obsidian-600: #283a5e;
 
-  --color-emerald-300: #6ee7b7;
-  --color-emerald-400: #34d399;
-  --color-emerald-500: #10b981;
-  --color-emerald-700: #047857;
+  --color-emerald-300: #6ff7e4;
+  --color-emerald-400: #2ee6cf;
+  --color-emerald-500: #12c2ab;
+  --color-emerald-700: #0a7a6c;
 
-  --color-gold-300: #f3d98b;
-  --color-gold-400: #e6c15a;
-  --color-gold-500: #c9a227;
-  --color-gold-700: #8a6d12;
+  --color-gold-300: #ffe08a;
+  --color-gold-400: #ffd04d;
+  --color-gold-500: #f5b800;
+  --color-gold-700: #a67c00;
+
+  /* Violet: futuristic glow accents (background haze, focus flourishes). */
+  --color-violet-400: #a78bfa;
+  --color-violet-600: #6d4fd8;
 
   /* Ember: bad habits / penalties. */
   --color-ember-300: #f6a7a0;
@@ -29,16 +35,21 @@
   --color-ember-500: #d9534a;
   --color-ember-700: #8e2a23;
 
-  --color-silver-100: #eef1f5;
-  --color-silver-300: #c8ced8;
-  --color-silver-500: #8b93a1;
+  --color-silver-100: #e8f1ff;
+  --color-silver-300: #b9c8e2;
+  --color-silver-500: #7f90b4;
 
-  --font-display: var(--font-cinzel), "Times New Roman", serif;
+  --font-display: var(--font-orbitron), "Segoe UI", system-ui, sans-serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
 }
 
 :root {
   color-scheme: dark;
+}
+
+/* The root is dark too, so iPhone safe areas and bounce-scroll never flash white. */
+html {
+  background-color: var(--color-obsidian-950);
 }
 
 /* Joyful dragons hop; disabled automatically by the reduced-motion rule below. */
@@ -219,6 +230,27 @@ body {
   background-color: var(--color-obsidian-950);
   color: var(--color-silver-100);
   font-family: var(--font-sans);
+}
+
+/* Futuristic backdrop: soft neon haze + a faint grid, fixed behind everything. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(60rem 40rem at 10% -10%, color-mix(in oklab, var(--color-emerald-400) 14%, transparent), transparent 70%),
+    radial-gradient(50rem 40rem at 110% 110%, color-mix(in oklab, var(--color-violet-600) 22%, transparent), transparent 70%),
+    linear-gradient(color-mix(in oklab, var(--color-emerald-400) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--color-emerald-400) 6%, transparent) 1px, transparent 1px);
+  background-size: auto, auto, 40px 40px, 40px 40px;
+}
+
+/* Headings get a faint neon glow in the futuristic display face. */
+.font-display {
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 18px color-mix(in oklab, currentColor 35%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

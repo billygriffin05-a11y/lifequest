@@ -34,7 +34,7 @@ export async function DragonLair() {
                 className="aspect-[7/5] w-full overflow-hidden rounded-xl border border-obsidian-700 p-1"
                 style={{
                   // Elemental glow behind each dragon (art data, from its palette).
-                  background: `radial-gradient(ellipse at 45% 65%, ${area.palette.breathOuter}40, transparent 70%), #07080a`,
+                  background: `radial-gradient(ellipse at 45% 65%, ${area.palette.breathOuter}40, transparent 70%), var(--color-obsidian-950)`,
                 }}
               >
                 <DragonSprite
