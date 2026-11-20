@@ -80,6 +80,27 @@ model CalendarOutbox {
   @@index([doneAt])
 }
 
+// ── Dragons ──────────────────────────────────────────────────────────────────
+
+/// Owner customisations for an area dragon (growth itself is derived from XP).
+model DragonProfile {
+  /// Area id, e.g. "fitness".
+  areaId     String   @id
+  customName String?
+  /// Equipped cosmetic item id from the treasure shop (see src/features/treasury/catalog.ts).
+  accessory  String?
+  updatedAt  DateTime @updatedAt
+}
+
+/// Gold spent in the treasure shop. Append-only; the gold balance is derived
+/// (earned from deeds/bonuses minus purchases). One purchase per item.
+model Purchase {
+  id          String   @id @default(cuid())
+  itemId      String   @unique
+  price       Int
+  purchasedAt DateTime @default(now())
+}
+
 // ── Honour: customisable good / bad actions ─────────────────────────────────
 
 /// A user-defined good or bad action, e.g. "Gym session" (+20, good) or
@@ -95,6 +116,8 @@ model PointAction {
   icon            String
   category        String
   sortOrder       Int          @default(0)
+  /// Optional goal: times per week (Mon–Sun, Europe/London). Good actions only.
+  weeklyTarget    Int?
   archivedAt      DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -118,6 +141,8 @@ model PointEntry {
   actionIcon      String
   /// Category at the time of logging — decides which area dragon gets the XP.
   actionCategory  String      @default("Other")
+  /// Optional short note from the owner ("5k in 28 min"). Not part of scoring.
+  note            String?
   /// Signed change to the Honour score.
   honourDelta     Int
   /// Change to XP (good actions only; negative only when reversing a good entry).
@@ -135,4 +160,191 @@ model PointEntry {
   @@index([occurredOn])
   @@index([actionId])
   @@index([actionCategory])
+}
+
+// ── Money (all amounts in integer pence, GBP) ───────────────────────────────
+
+/// A spending category with an optional monthly limit.
+model BudgetCategory {
+  id                String        @id @default(cuid())
+  name              String        @unique
+  icon              String
+  /// Monthly budget in pence; 0 = track only, no limit.
+  monthlyLimitPence Int           @default(0)
+  archivedAt        DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  version           Int           @default(1)
+  transactions      Transaction[]
+}
+
+/// One money movement. amountPence > 0 = spending, < 0 = income/refund.
+/// Soft-deleted (deletedAt) so history and audit stay intact.
+model Transaction {
+  id          String          @id @default(cuid())
+  occurredOn  String
+  amountPence Int
+  description String
+  categoryId  String?
+  category    BudgetCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  /// "manual" | "import"
+  source      String          @default("manual")
+  /// Import de-duplication fingerprint (null for manual entries).
+  importHash  String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+
+  @@index([occurredOn])
+  @@index([categoryId])
+}
+
+model SavingsGoal {
+  id          String           @id @default(cuid())
+  name        String
+  icon        String
+  targetPence Int
+  archivedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  deposits    SavingsDeposit[]
+}
+
+/// Append-only: withdrawals are negative deposits.
+model SavingsDeposit {
+  id          String      @id @default(cuid())
+  goalId      String
+  goal        SavingsGoal @relation(fields: [goalId], references: [id], onDelete: Restrict)
+  amountPence Int
+  occurredOn  String
+  createdAt   DateTime    @default(now())
+
+  @@index([goalId])
+}
+
+// ── Body (health data: stays on this PC, never logged) ──────────────────────
+
+/// One exercise entry in a workout. Weight in grams (int) to avoid floats.
+model WorkoutSet {
+  id          String    @id @default(cuid())
+  occurredOn  String
+  exercise    String
+  sets        Int
+  reps        Int
+  weightGrams Int       @default(0)
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  @@index([occurredOn])
+  @@index([exercise])
+}
+
+/// One run. Distance in metres, time in seconds.
+model RunLog {
+  id              String    @id @default(cuid())
+  occurredOn      String
+  distanceMetres  Int
+  durationSeconds Int
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  @@index([occurredOn])
+}
+
+/// Glasses of water drunk on a day (one row per day).
+model WaterDay {
+  day       String   @id
+  glasses   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+/// A night's sleep, keyed by the day you woke up. Times are "HH:MM" local.
+model SleepLog {
+  day       String   @id
+  bedTime   String
+  wakeTime  String
+  minutes   Int
+  updatedAt DateTime @updatedAt
+}
+
+/// Body weight for a day, in grams.
+model WeightLog {
+  day       String   @id
+  grams     Int
+  updatedAt DateTime @updatedAt
+}
+
+// ── Mind (reading, study, reflection: private, never logged) ────────────────
+
+model Book {
+  id         String       @id @default(cuid())
+  title      String
+  author     String       @default("")
+  totalPages Int
+  /// Set when pages read reaches totalPages.
+  finishedOn String?
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  logs       ReadingLog[]
+}
+
+/// Pages read in one sitting. Append-only; a book's progress is the sum.
+model ReadingLog {
+  id        String   @id @default(cuid())
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  day       String
+  pages     Int
+  createdAt DateTime @default(now())
+
+  @@index([bookId])
+  @@index([day])
+}
+
+/// Spaced-repetition card (Leitner boxes 1-5).
+model Flashcard {
+  id         String       @id @default(cuid())
+  deck       String       @default("Security+")
+  topic      String       @default("")
+  front      String
+  back       String
+  box        Int          @default(1)
+  dueOn      String
+  /// Stable key for starter cards so re-seeding never duplicates.
+  seedKey    String?      @unique
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  reviews    CardReview[]
+
+  @@index([dueOn])
+}
+
+model CardReview {
+  id        String    @id @default(cuid())
+  cardId    String
+  card      Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  day       String
+  correct   Boolean
+  createdAt DateTime  @default(now())
+
+  @@index([day])
+}
+
+/// One per day: mood 1-5 and/or a short journal entry.
+model Reflection {
+  day       String   @id
+  mood      Int?
+  entry     String?
+  updatedAt DateTime @updatedAt
+}
+
+/// A completed focus (Pomodoro) session.
+model FocusSession {
+  id        String   @id @default(cuid())
+  day       String
+  minutes   Int
+  label     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([day])
 }

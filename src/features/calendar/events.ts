@@ -23,7 +23,13 @@ export function eventIdFor(entryId: string): string {
 
 const EVENT_MINUTES = 15;
 
-export function eventBodyFor(deed: DeedForCalendar) {
+/** Event description: what it was, plus the owner's note if there is one. */
+export function eventDescriptionFor(kind: string, note?: string | null): string {
+  const base = kind === "good" ? "Good deed logged in LIFEQUEST." : "Bad habit logged in LIFEQUEST.";
+  return note ? `${note}\n\n${base}` : base;
+}
+
+export function eventBodyFor(deed: DeedForCalendar & { note?: string | null }) {
   const good = deed.kind === "good";
   const points = Math.abs(deed.honourDelta);
   const start = deed.occurredAt;
@@ -31,7 +37,7 @@ export function eventBodyFor(deed: DeedForCalendar) {
   return {
     id: eventIdFor(deed.id),
     summary: `${good ? "✅" : "❌"} ${deed.actionIcon} ${deed.actionName} (${good ? "+" : "−"}${points} Honour)`,
-    description: good ? "Good deed logged in LIFEQUEST." : "Bad habit logged in LIFEQUEST.",
+    description: eventDescriptionFor(deed.kind, deed.note),
     start: { dateTime: start.toISOString(), timeZone: "Europe/London" },
     end: { dateTime: end.toISOString(), timeZone: "Europe/London" },
     colorId: good ? "10" : "11", // Google palette: 10 = basil (green), 11 = tomato (red)

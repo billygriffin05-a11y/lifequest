@@ -4,7 +4,7 @@ import { getDataPaths } from "@/server/config/paths";
 import { prisma } from "@/server/db/client";
 import type { DeedForCalendar } from "../events";
 import { loadGoogleConfig } from "../google/client-file";
-import { enqueueCreate, enqueueDelete, processOutbox, type CalendarDeps } from "./service";
+import { enqueueCreate, enqueueDelete, enqueuePatch, processOutbox, type CalendarDeps } from "./service";
 
 /** Production dependencies (real DB, real data dir, real fetch). */
 export function calendarDeps(): CalendarDeps {
@@ -30,6 +30,15 @@ export async function onDeedLogged(deed: DeedForCalendar): Promise<void> {
   }
 }
 
+/** Called after the owner sets a note on a deed. Never throws. */
+export async function onDeedNoteChanged(entryId: string, kind: string, note: string | null): Promise<void> {
+  try {
+    if (await enqueuePatch(prisma, entryId, kind, note)) syncInBackground();
+  } catch {
+    console.error("[calendar] could not queue event update");
+  }
+}
+
 /** Called after a deed is undone. Never throws. */
 export async function onDeedUndone(originalEntryId: string): Promise<void> {
   try {
@@ -37,4 +46,9 @@ export async function onDeedUndone(originalEntryId: string): Promise<void> {
   } catch {
     console.error("[calendar] could not queue event removal");
   }
+}
+
+/** Push queued calendar changes right after the current request. */
+export function syncSoon(): void {
+  syncInBackground();
 }

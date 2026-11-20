@@ -8,12 +8,13 @@
 import "server-only";
 import { refresh } from "next/cache";
 import { z } from "zod";
-import { onDeedLogged, onDeedUndone } from "@/features/calendar/server/runtime";
+import { onDeedLogged, onDeedNoteChanged, onDeedUndone } from "@/features/calendar/server/runtime";
 import { prisma } from "@/server/db/client";
-import { actionInputSchema, idSchema, logInputSchema, undoInputSchema } from "../schemas";
+import { actionInputSchema, idSchema, logInputSchema, noteInputSchema, undoInputSchema } from "../schemas";
+import { logMomentFor } from "../rules";
 import * as service from "./service";
 
-type Field = "name" | "kind" | "points" | "icon" | "category";
+type Field = "name" | "kind" | "points" | "icon" | "category" | "weeklyTarget";
 
 export type FormState = {
   ok: boolean;
@@ -25,7 +26,7 @@ export type FormState = {
 
 function echoValues(formData: FormData): FormState["values"] {
   const out: FormState["values"] = {};
-  for (const key of ["name", "kind", "points", "icon", "category"] as const) {
+  for (const key of ["name", "kind", "points", "icon", "category", "weeklyTarget"] as const) {
     const v = formData.get(key);
     if (typeof v === "string") out[key] = v.slice(0, 100);
   }
@@ -39,13 +40,14 @@ function readActionForm(formData: FormData) {
     points: formData.get("points"),
     icon: formData.get("icon"),
     category: formData.get("category"),
+    weeklyTarget: formData.get("weeklyTarget") ?? "",
   });
 }
 
 function toFieldErrors(error: z.ZodError): FormState["fieldErrors"] {
   const flat = z.flattenError(error).fieldErrors as Record<string, string[] | undefined>;
   const out: FormState["fieldErrors"] = {};
-  for (const key of ["name", "kind", "points", "icon", "category"] as const) {
+  for (const key of ["name", "kind", "points", "icon", "category", "weeklyTarget"] as const) {
     if (flat[key]?.[0]) out[key] = flat[key][0];
   }
   return out;
@@ -101,17 +103,36 @@ export async function setArchivedAction(formData: FormData): Promise<void> {
   refresh();
 }
 
+export async function moveActionAction(formData: FormData): Promise<void> {
+  const id = idSchema.safeParse(formData.get("id"));
+  const direction = formData.get("direction") === "up" ? "up" : "down";
+  if (!id.success) return;
+  try {
+    await service.moveAction(prisma, id.data, direction);
+  } catch (err) {
+    failure(err);
+    return;
+  }
+  refresh();
+}
+
 export async function addStarterActionsAction(): Promise<void> {
   await service.addStarterActions(prisma);
   refresh();
 }
 
-export async function logActionAction(input: { actionId: string; idempotencyKey: string }): Promise<FormState> {
+export async function logActionAction(input: {
+  actionId: string;
+  idempotencyKey: string;
+  day?: "today" | "yesterday";
+}): Promise<FormState> {
   const parsed = logInputSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Invalid request." };
   let entry;
   try {
-    entry = await service.logAction(prisma, parsed.data);
+    // "Forgot yesterday?" logs at the same time of day, 24 hours ago.
+    const when = logMomentFor(parsed.data.day ?? "today");
+    entry = await service.logAction(prisma, { actionId: parsed.data.actionId, idempotencyKey: parsed.data.idempotencyKey }, when);
   } catch (err) {
     return failure(err);
   }
@@ -132,4 +153,18 @@ export async function undoEntryAction(input: { entryId: string; idempotencyKey: 
   if (reversal.reversesEntryId) await onDeedUndone(reversal.reversesEntryId); // never throws
   refresh();
   return { ok: true };
+}
+
+export async function setEntryNoteAction(input: { entryId: string; note: string }): Promise<FormState> {
+  const parsed = noteInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid note." };
+  let entry;
+  try {
+    entry = await service.setEntryNote(prisma, parsed.data.entryId, parsed.data.note);
+  } catch (err) {
+    return failure(err);
+  }
+  await onDeedNoteChanged(entry.id, entry.kind, entry.note); // Google Calendar (if linked); never throws
+  refresh();
+  return { ok: true, message: entry.note ? "Note saved." : "Note removed." };
 }

@@ -35,12 +35,38 @@ export const actionInputSchema = z
       .max(MAX_POINTS, `Points must be ${MAX_POINTS} or fewer`),
     icon: trimmed("Icon", 16),
     category: trimmed("Category", 30),
+    /** Optional: times per week (1–7). Empty = no target. */
+    weeklyTarget: z.preprocess(
+      (v) => (v === "" || v === undefined || v === null ? null : v),
+      z.coerce
+        .number({ error: "Weekly goal must be a number" })
+        .int("Weekly goal must be a whole number")
+        .min(1, "Weekly goal must be 1–7")
+        .max(7, "Weekly goal must be 1–7")
+        .nullable(),
+    ).optional(),
   })
   .strict();
-export type ActionInput = z.infer<typeof actionInputSchema>;
+/** What callers may pass (weeklyTarget optional); the service parses it. */
+export type ActionInput = z.input<typeof actionInputSchema>;
 
 export const idSchema = z.string().trim().min(1).max(64);
 export const idempotencyKeySchema = z.uuid();
 
-export const logInputSchema = z.object({ actionId: idSchema, idempotencyKey: idempotencyKeySchema }).strict();
+export const logInputSchema = z
+  .object({ actionId: idSchema, idempotencyKey: idempotencyKeySchema, day: z.enum(["today", "yesterday"]).optional() })
+  .strict();
 export const undoInputSchema = z.object({ entryId: idSchema, idempotencyKey: idempotencyKeySchema }).strict();
+
+export const MAX_NOTE = 140;
+/** Empty note clears it. */
+export const noteInputSchema = z
+  .object({
+    entryId: idSchema,
+    note: z
+      .string()
+      .trim()
+      .max(MAX_NOTE, `Notes must be ${MAX_NOTE} characters or fewer`)
+      .transform((s) => (s.length ? s : null)),
+  })
+  .strict();

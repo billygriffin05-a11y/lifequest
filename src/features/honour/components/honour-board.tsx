@@ -1,11 +1,26 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { getDragons } from "@/features/dragons/server/service";
 import { prisma } from "@/server/db/client";
-import { LIFEQUEST_TIME_ZONE } from "../rules";
-import { addStarterActionsAction, setArchivedAction } from "../server/actions";
-import { getDailyTrend, getLoggedTodayActionIds, getSummary, getTodayEntries, listActions, TREND_RANGES, type TrendRange } from "../server/service";
+import { QUEST_BONUS } from "../progress";
+import { LIFEQUEST_TIME_ZONE, logMomentFor } from "../rules";
+import { addStarterActionsAction, moveActionAction, setArchivedAction } from "../server/actions";
+import {
+  getDailyTrend,
+  getLoggedTodayActionIds,
+  getPlayerProgress,
+  getSummary,
+  getTodayEntries,
+  listActions,
+  TREND_RANGES,
+  type TrendRange,
+} from "../server/service";
 import { ActionForm } from "./action-form";
 import { LogButton } from "./log-button";
+import { BossCard } from "./boss-card";
+import { LevelUp } from "./level-up";
+import { NoteEditor } from "./note-editor";
+import { RankCard } from "./rank-card";
 import { TrendChart } from "./trend-chart";
 import { UndoButton } from "./undo-button";
 
@@ -26,25 +41,40 @@ export async function HonourBoard({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await connection(); // personal data: always read at request time, never prerendered
-  const range = parseRange((await searchParams).range);
-  const [summary, active, all, today, trend, doneToday] = await Promise.all([
+  const sp = await searchParams;
+  const range = parseRange(sp.range);
+  const day = sp.day === "yesterday" ? "yesterday" : "today";
+  const logDate = logMomentFor(day);
+  const [summary, active, all, today, trend, doneToday, progress, dragons] = await Promise.all([
     getSummary(prisma),
     listActions(prisma),
     listActions(prisma, { includeArchived: true }),
     getTodayEntries(prisma),
     getDailyTrend(prisma, range),
-    getLoggedTodayActionIds(prisma),
+    getLoggedTodayActionIds(prisma, logDate),
+    getPlayerProgress(prisma),
+    getDragons(prisma),
   ]);
   const good = active.filter((a) => a.kind === "good");
   const bad = active.filter((a) => a.kind === "bad");
 
+  const milestones = {
+    rankLevel: progress.rank.level,
+    rankTitle: progress.rank.title,
+    dragons: Object.fromEntries(
+      dragons.map((d) => [d.area.id, { stage: d.growth.stage, stageName: d.growth.stageName, name: d.displayName }]),
+    ),
+  };
+
   return (
     <div className="grid gap-6">
+      <LevelUp now={milestones} />
       {/* Scores */}
-      <section aria-labelledby="scores-heading" className="grid gap-4 sm:grid-cols-3">
+      <section aria-labelledby="scores-heading" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <h2 id="scores-heading" className="sr-only">
           Scores
         </h2>
+        <RankCard rank={progress.rank} bonusXp={progress.bonusXp} />
         <div className={`${card} border-gold-500/40`}>
           <p className="text-xs uppercase tracking-[0.25em] text-silver-300">Honour</p>
           <p data-testid="honour-total" className="mt-2 font-display text-4xl font-bold text-gold-300">
@@ -54,8 +84,13 @@ export async function HonourBoard({
         <div className={card}>
           <p className="text-xs uppercase tracking-[0.25em] text-silver-300">Total XP</p>
           <p data-testid="xp-total" className="mt-2 font-display text-4xl font-bold text-emerald-300">
-            {num.format(summary.xp)}
+            {num.format(progress.totalXp)}
           </p>
+          {progress.bonusXp > 0 && (
+            <p className="mt-1 text-sm text-silver-300">
+              {num.format(summary.xp)} + <span className="text-gold-300">🔥 {num.format(progress.bonusXp)}</span> streak bonus
+            </p>
+          )}
         </div>
         <div className={card}>
           <p className="text-xs uppercase tracking-[0.25em] text-silver-300">Today</p>
@@ -101,6 +136,60 @@ export async function HonourBoard({
         </div>
       </section>
 
+      <BossCard boss={progress.boss} wins={progress.bossWins} />
+
+      {/* Daily quests */}
+      {progress.quests.length > 0 && (
+        <section aria-labelledby="quests-heading" className={`${card} border-gold-500/40`} data-testid="quests">
+          <h2 id="quests-heading" className="font-display text-xl text-gold-300">
+            Today&apos;s quests
+          </h2>
+          <p className="mt-1 text-sm text-silver-300">Complete these good deeds today for +{QUEST_BONUS} bonus XP each.</p>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+            {progress.quests.map((q) => (
+              <li
+                key={q.actionId}
+                className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${
+                  q.done ? "border-emerald-500/50 bg-emerald-700/15" : "border-obsidian-600"
+                }`}
+              >
+                <span aria-hidden="true" className="text-2xl">
+                  {q.icon}
+                </span>
+                <span className="flex-1 text-silver-100">{q.name}</span>
+                <span className={q.done ? "text-emerald-300" : "text-silver-300"}>{q.done ? "✓ Done" : `+${QUEST_BONUS} XP`}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Log for today / yesterday */}
+      <div className="flex flex-wrap items-center gap-3 text-sm" data-testid="day-toggle">
+        {day === "yesterday" ? (
+          <>
+            <p role="status" className="rounded-lg border border-gold-500/50 bg-gold-500/10 px-3 py-2 text-gold-300">
+              Logging for <strong>yesterday</strong>. Each action still counts once per day.
+            </p>
+            <Link href="/honour" scroll={false} className="inline-flex min-h-11 items-center text-emerald-300 underline underline-offset-4">
+              Back to today
+            </Link>
+          </>
+        ) : (
+          <Link href="/honour?day=yesterday" scroll={false} className="inline-flex min-h-11 items-center text-silver-300 underline underline-offset-4 hover:text-gold-300">
+            Forgot something yesterday?
+          </Link>
+        )}
+        <span className="text-silver-500" aria-hidden="true">·</span>
+        <Link href="/honour/history" className="inline-flex min-h-11 items-center text-silver-300 underline underline-offset-4 hover:text-gold-300">
+          Habit heatmap
+        </Link>
+        <span className="text-silver-500" aria-hidden="true">·</span>
+        <a href="/api/export/ledger" className="inline-flex min-h-11 items-center text-silver-300 underline underline-offset-4 hover:text-gold-300">
+          Export CSV
+        </a>
+      </div>
+
       {/* Log */}
       {active.length === 0 ? (
         <section className={`${card} text-center`} aria-labelledby="empty-heading">
@@ -131,7 +220,7 @@ export async function HonourBoard({
               <ul className="mt-4 grid gap-3">
                 {good.map((a) => (
                   <li key={a.id}>
-                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="good" category={a.category} doneToday={doneToday.has(a.id)} />
+                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="good" category={a.category} doneToday={doneToday.has(a.id)} streak={progress.streaks[a.id] ?? 0} weekly={progress.weekly[a.id]} day={day} />
                   </li>
                 ))}
               </ul>
@@ -147,7 +236,7 @@ export async function HonourBoard({
               <ul className="mt-4 grid gap-3">
                 {bad.map((a) => (
                   <li key={a.id}>
-                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="bad" category={a.category} doneToday={doneToday.has(a.id)} />
+                    <LogButton actionId={a.id} name={a.name} icon={a.icon} points={a.points} kind="bad" category={a.category} doneToday={doneToday.has(a.id)} day={day} />
                   </li>
                 ))}
               </ul>
@@ -168,17 +257,23 @@ export async function HonourBoard({
         ) : (
           <ul className="mt-4 divide-y divide-obsidian-700" data-testid="today-list">
             {today.map((e) => (
-              <li key={e.id} className="flex min-h-14 items-center gap-3 py-2">
+              <li key={e.id} className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 py-2">
                 <span aria-hidden="true" className="text-xl">
                   {e.icon}
                 </span>
-                <span className={`flex-1 ${e.undone ? "text-silver-500 line-through" : "text-silver-100"}`}>
+                <span className={`min-w-0 flex-1 ${e.undone ? "text-silver-500 line-through" : "text-silver-100"}`}>
                   {e.name}
                   <span className="ml-2 text-xs text-silver-300">{timeFmt.format(e.occurredAt)}</span>
+                  {e.note && (
+                    <span className="block text-sm italic text-silver-300" data-testid="entry-note">
+                      “{e.note}”
+                    </span>
+                  )}
                 </span>
                 <span className={`font-semibold ${e.honourDelta >= 0 ? "text-emerald-300" : "text-ember-300"}`}>
                   {signed(e.honourDelta)}
                 </span>
+                {!e.undone && <NoteEditor entryId={e.id} name={e.name} note={e.note} />}
                 {e.undone ? <span className="text-sm text-silver-300">Undone</span> : <UndoButton entryId={e.id} name={e.name} />}
               </li>
             ))}
@@ -197,9 +292,28 @@ export async function HonourBoard({
         </div>
         {all.length > 0 && (
           <ul className="mt-4 grid gap-2">
-            {all.map((a) => (
-              <li key={a.id} className="rounded-xl border border-obsidian-700 p-3">
+            {all.map((a, i) => (
+              <li key={a.id} className="rounded-xl border border-obsidian-700 p-3" data-testid="manage-action">
                 <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-col">
+                    {(["up", "down"] as const).map((dir) => {
+                      const disabled = dir === "up" ? i === 0 : i === all.length - 1;
+                      return (
+                        <form key={dir} action={moveActionAction}>
+                          <input type="hidden" name="id" value={a.id} />
+                          <input type="hidden" name="direction" value={dir} />
+                          <button
+                            type="submit"
+                            disabled={disabled}
+                            aria-label={`Move ${a.name} ${dir}`}
+                            className="min-h-11 min-w-11 rounded-md text-silver-300 hover:text-gold-300 disabled:opacity-30 focus-visible:outline-2 focus-visible:outline-emerald-400"
+                          >
+                            {dir === "up" ? "▲" : "▼"}
+                          </button>
+                        </form>
+                      );
+                    })}
+                  </div>
                   <span aria-hidden="true" className="text-xl">
                     {a.icon}
                   </span>
@@ -234,6 +348,7 @@ export async function HonourBoard({
                         points: a.points,
                         icon: a.icon,
                         category: a.category,
+                        weeklyTarget: a.weeklyTarget,
                       }}
                     />
                   </div>

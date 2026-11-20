@@ -12,9 +12,15 @@ interface Props {
   category: string;
   /** Already logged today (one per day). */
   doneToday?: boolean;
+  /** Current streak in days (good actions). */
+  streak?: number;
+  /** This week's progress toward a weekly goal. */
+  weekly?: { done: number; target: number };
+  /** Log for yesterday instead of today. */
+  day?: "today" | "yesterday";
 }
 
-export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false }: Props) {
+export function LogButton({ actionId, name, icon, points, kind, category, doneToday = false, streak = 0, weekly, day = "today" }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const good = kind === "good";
@@ -26,13 +32,15 @@ export function LogButton({ actionId, name, icon, points, kind, category, doneTo
         type="button"
         disabled={pending || doneToday}
         aria-label={
-          doneToday ? `${name}: done today` : `Log ${name}: ${good ? "plus" : "minus"} ${points} Honour`
+          doneToday
+            ? `${name}: done ${day === "yesterday" ? "yesterday" : "today"}`
+            : `Log ${name}${day === "yesterday" ? " for yesterday" : ""}: ${good ? "plus" : "minus"} ${points} Honour`
         }
         onClick={() =>
           startTransition(async () => {
             setError(null);
             // A fresh key per tap: retries of this request can never double-count.
-            const result = await logActionAction({ actionId, idempotencyKey: crypto.randomUUID() });
+            const result = await logActionAction({ actionId, idempotencyKey: crypto.randomUUID(), day });
             if (!result.ok) setError(result.message ?? "Could not log that.");
           })
         }
@@ -47,10 +55,25 @@ export function LogButton({ actionId, name, icon, points, kind, category, doneTo
         </span>
         <span className="flex-1">
           <span className="block font-medium text-silver-100">{name}</span>
-          <span className="block text-xs text-silver-300">{category}</span>
+          <span className="block text-xs text-silver-300">
+            {category}
+            {streak >= 2 && (
+              <span className="ml-2 font-semibold text-gold-300" data-testid="streak">
+                🔥 {streak}-day streak
+              </span>
+            )}
+            {weekly && (
+              <span
+                className={`ml-2 font-semibold ${weekly.done >= weekly.target ? "text-emerald-300" : "text-silver-100"}`}
+                data-testid="weekly"
+              >
+                {weekly.done >= weekly.target ? "✓" : "📅"} {Math.min(weekly.done, weekly.target)}/{weekly.target} this week
+              </span>
+            )}
+          </span>
         </span>
         {doneToday ? (
-          <span className="text-sm font-semibold text-silver-300">✓ Done today</span>
+          <span className="text-sm font-semibold text-silver-300">✓ Done {day === "yesterday" ? "yesterday" : "today"}</span>
         ) : (
           <span className={`font-display text-lg font-bold ${good ? "text-emerald-300" : "text-ember-300"}`}>{signed}</span>
         )}
