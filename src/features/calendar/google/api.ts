@@ -121,6 +121,7 @@ async function calendarCall(fetchImpl: Fetch, accessToken: string, method: strin
 
 export interface GoogleCalendarListEntry {
   id: string;
+  primary?: boolean;
   summary?: string;
   summaryOverride?: string;
   backgroundColor?: string;

@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Fetch } from "@/features/calendar/google/api";
-import { clearGoogleEventsCache, getGoogleEvents } from "@/features/calendar/server/google-events";
+import { clearGoogleEventsCache, getCalendarOverview, getGoogleEvents } from "@/features/calendar/server/google-events";
 import { saveConnection, type CalendarDeps } from "@/features/calendar/server/service";
 import { createPrismaClient } from "@/server/db/factory";
 import { makeTempDataDir, migrate } from "../support/temp-data-dir";
@@ -26,7 +26,7 @@ const fetchImpl: Fetch = async (input, init) => {
   if (url.includes("/users/me/calendarList")) {
     return json(200, {
       items: [
-        { id: "primary@x", summary: "Billy", backgroundColor: "#7986cb", selected: true },
+        { id: "primary@x", summary: "Billy", backgroundColor: "#7986cb", selected: true, primary: true },
         { id: "lq@group", summary: "LIFEQUEST", selected: true },
         { id: "hidden@x", summary: "Old", selected: false },
       ],
@@ -70,6 +70,16 @@ describe("Google events in the in-app calendar", () => {
       ["2026-11-20", "Dentist", "09:30"],
     ]);
     expect(r.events[0]).toMatchObject({ calendar: "Billy", colour: "#7986cb", allDay: true });
+  });
+
+  it("explains which calendars are read and how many events each has", async () => {
+    const o = await getCalendarOverview(deps, "2026-11-01", "2026-11-30");
+    expect(o.status).toBe("ok");
+    expect(o.calendars).toEqual([
+      { name: "Billy", colour: "#7986cb", primary: true, included: true, reason: null, events: 3 },
+      { name: "LIFEQUEST", colour: null, primary: false, included: false, reason: "lifequest", events: null },
+      { name: "Old", colour: null, primary: false, included: false, reason: "hidden", events: null },
+    ]);
   });
 
   it("asks to re-link when the old connection lacks read access", async () => {
