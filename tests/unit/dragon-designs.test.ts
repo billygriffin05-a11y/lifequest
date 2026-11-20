@@ -34,13 +34,32 @@ describe("each element has its own dragon design", () => {
     expect(new Set(ELEMENTS.map((e) => PLANS[e].tail)).size).toBe(ELEMENTS.length);
   });
 
-  it("gives every adult dragon a clearly different silhouette, not just a recolour", () => {
+  it("gives every grounded adult dragon a clearly different silhouette, not just a recolour", () => {
     for (let i = 0; i < ELEMENTS.length; i++) {
       for (let j = i + 1; j < ELEMENTS.length; j++) {
-        const d = difference(shape(ELEMENTS[i], 19), shape(ELEMENTS[j], 19));
+        const d = difference(shape(ELEMENTS[i], 16), shape(ELEMENTS[j], 16));
         expect(d, `${ELEMENTS[i]} vs ${ELEMENTS[j]}`).toBeGreaterThan(0.15);
       }
     }
+  });
+
+  it("still differs once flying, when big spread wings dominate the outline", () => {
+    for (let i = 0; i < ELEMENTS.length; i++) {
+      for (let j = i + 1; j < ELEMENTS.length; j++) {
+        const d = difference(shape(ELEMENTS[i], 19), shape(ELEMENTS[j], 19));
+        expect(d, `${ELEMENTS[i]} vs ${ELEMENTS[j]}`).toBeGreaterThan(0.12);
+      }
+    }
+  });
+
+  it("flies from Primordial (stage 17) with a ground shadow, and has no crown", () => {
+    expect(spriteLayers(16, "content", "fire").flying).toBe(false);
+    const sky = spriteLayers(17, "content", "fire");
+    expect(sky.flying).toBe(true);
+    expect(sky.shadow.length).toBeGreaterThan(0);
+    // The old stage-19 crown sat directly above the head in aura pixels; nothing there now.
+    const l = spriteLayers(19, "content", "water");
+    expect(l.body.some((r) => r.role === "aura" && r.y >= l.head[1] - 3 && r.y <= l.head[1] && r.x <= l.head[0] && r.x + r.w > l.head[0])).toBe(false);
   });
 
   it("already differs as a young dragon (before wings)", () => {
