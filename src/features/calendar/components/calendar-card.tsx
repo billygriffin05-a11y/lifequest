@@ -43,8 +43,8 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
       </h2>
       <p className="mt-1 text-sm text-silver-300">
         Every good deed and bad habit you log is added to a separate <strong className="text-silver-100">LIFEQUEST</strong>{" "}
-        calendar in your Google account. Undo removes it again. LIFEQUEST can only see that one calendar — not your
-        other calendars or events.
+        calendar in your Google account. Undo removes it again. LIFEQUEST can also <em>read</em> your other calendars so
+        they show in the in-app Calendar — it never changes or stores those events.
       </p>
 
       {flag && (
@@ -92,6 +92,10 @@ export async function CalendarCard({ searchParams }: { searchParams: Promise<Rec
                 Sync now
               </button>
             </form>
+            {/* Re-linking asks Google for the current permissions (incl. read-only access to your own events). */}
+            <a href="/api/integrations/google/start" className={`${btn} border border-gold-500/50 text-gold-300 hover:bg-gold-500/10`}>
+              Re-link
+            </a>
             <form action={disconnectCalendarAction}>
               <button type="submit" className={`${btn} border border-ember-500/50 text-ember-300 hover:bg-ember-700/20`}>
                 Unlink

@@ -117,6 +117,60 @@ async function calendarCall(fetchImpl: Fetch, accessToken: string, method: strin
   });
 }
 
+// ── Read-only: the owner's own calendars ─────────────────────────────────────
+
+export interface GoogleCalendarListEntry {
+  id: string;
+  summary?: string;
+  summaryOverride?: string;
+  backgroundColor?: string;
+  selected?: boolean;
+  hidden?: boolean;
+}
+
+export interface GoogleEventTime {
+  date?: string;
+  dateTime?: string;
+}
+
+export interface GoogleEventItem {
+  id: string;
+  status?: string;
+  summary?: string;
+  start?: GoogleEventTime;
+  end?: GoogleEventTime;
+}
+
+/** Calendars shown in the owner's Google Calendar (needs calendarlist.readonly). */
+export async function listCalendars(fetchImpl: Fetch, accessToken: string): Promise<GoogleCalendarListEntry[]> {
+  const res = await calendarCall(fetchImpl, accessToken, "GET", "/users/me/calendarList?minAccessRole=reader&maxResults=100");
+  if (!res.ok) throw new GoogleApiError(`Could not list calendars (${res.status})`, res.status);
+  return ((await res.json()) as { items?: GoogleCalendarListEntry[] }).items ?? [];
+}
+
+/** Events in [timeMin, timeMax), recurring ones expanded (needs events.readonly). */
+export async function listEvents(
+  fetchImpl: Fetch,
+  accessToken: string,
+  calendarId: string,
+  timeMin: string,
+  timeMax: string,
+): Promise<GoogleEventItem[]> {
+  const out: GoogleEventItem[] = [];
+  let pageToken: string | undefined;
+  for (let page = 0; page < 5; page++) {
+    const q = new URLSearchParams({ timeMin, timeMax, singleEvents: "true", orderBy: "startTime", maxResults: "250" });
+    if (pageToken) q.set("pageToken", pageToken);
+    const res = await calendarCall(fetchImpl, accessToken, "GET", `/calendars/${encodeURIComponent(calendarId)}/events?${q}`);
+    if (!res.ok) throw new GoogleApiError(`Could not read events (${res.status})`, res.status);
+    const json = (await res.json()) as { items?: GoogleEventItem[]; nextPageToken?: string };
+    out.push(...(json.items ?? []));
+    pageToken = json.nextPageToken;
+    if (!pageToken) break;
+  }
+  return out;
+}
+
 export async function createLifequestCalendar(fetchImpl: Fetch, accessToken: string): Promise<string> {
   const res = await calendarCall(fetchImpl, accessToken, "POST", "/calendars", {
     summary: CALENDAR_NAME,
