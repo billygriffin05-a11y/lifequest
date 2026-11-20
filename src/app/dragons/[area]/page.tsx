@@ -166,7 +166,7 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
 
 export default function DragonPage({ params }: PageProps<"/dragons/[area]">) {
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-[max(2rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/dragons" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← Dragon Lair
