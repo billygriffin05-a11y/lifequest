@@ -57,9 +57,9 @@ export const PLANS: Record<Element, BodyPlan> = {
     tail: "wave", tailLen: 1.35, back: "fins", wing: "fin", wingSpan: 0.9, horns: "swept",
   },
   ice: {
-    look: "Crystal wyrm: tall and proud, ice-shard spikes, a crystal horn crown and a blade tail.",
-    bodyW: 0.92, bodyH: 1.12, lift: -1.5, neckX: -0.5, neckY: -3, head: 1.05, legW: 1.25,
-    tail: "blade", tailLen: 0.95, back: "shards", wing: "sharp", wingSpan: 1.05, horns: "crystal",
+    look: "Crystal wyrm: tall and proud, ice-shard spikes, crystal horns and a blade tail.",
+    bodyW: 0.88, bodyH: 1.2, lift: -1.5, neckX: -1.5, neckY: -4.5, head: 1.05, legW: 1.25,
+    tail: "blade", tailLen: 1.1, back: "shards", wing: "sharp", wingSpan: 1.25, horns: "crystal",
   },
   air: {
     look: "Sky glider: slender body, huge feathered wings and a fan tail.",
