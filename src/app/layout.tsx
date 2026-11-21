@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Pixelify_Sans } from "next/font/google";
 import { ServiceWorker } from "@/components/service-worker";
+import { SiteMenu } from "@/components/site-menu";
 import { NeonCity } from "@/components/ui/neon-city";
 import "./globals.css";
 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="en-GB" className={`${pixel.variable} ${inter.variable} h-full bg-obsidian-950 antialiased`}>
       <body className="min-h-full flex flex-col">
         <NeonCity />
+        <SiteMenu />
         {children}
         <ServiceWorker />
       </body>
