@@ -6,7 +6,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Fetch } from "@/features/calendar/google/api";
-import { clearGoogleEventsCache, getCalendarOverview, getGoogleEvents } from "@/features/calendar/server/google-events";
+import { clearGoogleEventsCache, findEvents, getCalendarOverview, getGoogleEvents } from "@/features/calendar/server/google-events";
 import { saveConnection, type CalendarDeps } from "@/features/calendar/server/service";
 import { createPrismaClient } from "@/server/db/factory";
 import { makeTempDataDir, migrate } from "../support/temp-data-dir";
@@ -31,6 +31,22 @@ const fetchImpl: Fetch = async (input, init) => {
         { id: "hidden@x", summary: "Old", selected: false },
       ],
     });
+  }
+  if (url.includes("/events?") && url.includes("q=")) {
+    if (!url.includes(encodeURIComponent("hidden@x"))) return json(200, { items: [] });
+    return json(200, { items: [{ id: "r", summary: "Pay rent", start: { date: "2026-01-01" }, recurrence: ["RRULE:FREQ=MONTHLY"] }] });
+  }
+  if (url.includes(`/calendars/${encodeURIComponent("lq@group")}/events`)) {
+    return json(200, {
+      items: [
+        { id: "lqdeed", summary: "✅ Gym", start: { dateTime: "2026-11-05T09:00:00Z" }, extendedProperties: { private: { lifequestEntryId: "e1" } } },
+        { id: "lqremind0001_20261105", summary: "Log your deeds", start: { dateTime: "2026-11-05T20:00:00Z" }, extendedProperties: { private: { lifequestReminder: "daily" } } },
+        { id: "own1", summary: "Rent (owner-made)", start: { date: "2026-11-01" }, end: { date: "2026-11-02" } },
+      ],
+    });
+  }
+  if (url.includes(`/calendars/${encodeURIComponent("hidden@x")}/events`)) {
+    return json(200, { items: [{ id: "h1", summary: "Pay rent", start: { date: "2026-11-01" }, end: { date: "2026-11-02" } }] });
   }
   if (url.includes(`/calendars/${encodeURIComponent("primary@x")}/events`)) {
     return json(200, {
@@ -61,13 +77,15 @@ describe("Google events in the in-app calendar", () => {
     expect((await getGoogleEvents({ ...deps, cfg: null }, "2026-11-01", "2026-11-30")).status).toBe("not-configured");
   });
 
-  it("shows the owner's events, skipping LIFEQUEST's own and hidden calendars", async () => {
+  it("shows the owner's events, skipping only LIFEQUEST's own calendar", async () => {
     await saveConnection(deps, { accessToken: "a", refreshToken: "r", expiresAt: new Date(Date.now() + 3_600_000) });
     const r = await getGoogleEvents(deps, "2026-11-01", "2026-11-30");
     expect(r.status).toBe("ok");
-    expect(r.events.map((e) => [e.day, e.title, e.start])).toEqual([
-      ["2026-11-01", "Pay rent", null],
-      ["2026-11-20", "Dentist", "09:30"],
+    expect(r.events.map((e) => [e.day, e.title, e.calendar])).toEqual([
+      ["2026-11-01", "Pay rent", "Billy"],
+      ["2026-11-20", "Dentist", "Billy"],
+      ["2026-11-01", "Rent (owner-made)", "LIFEQUEST"],
+      ["2026-11-01", "Pay rent", "Old"],
     ]);
     expect(r.events[0]).toMatchObject({ calendar: "Billy", colour: "#7986cb", allDay: true });
   });
@@ -77,9 +95,14 @@ describe("Google events in the in-app calendar", () => {
     expect(o.status).toBe("ok");
     expect(o.calendars).toEqual([
       { name: "Billy", colour: "#7986cb", primary: true, included: true, reason: null, events: 3 },
-      { name: "LIFEQUEST", colour: null, primary: false, included: false, reason: "lifequest", events: null },
-      { name: "Old", colour: null, primary: false, included: false, reason: "hidden", events: null },
+      { name: "LIFEQUEST", colour: null, primary: false, included: true, reason: null, events: 1 },
+      { name: "Old", colour: null, primary: false, included: true, reason: null, events: 1 },
     ]);
+  });
+
+  it("finds an event across every calendar, including unticked ones", async () => {
+    const f = await findEvents(deps, "rent", "2026-11-21");
+    expect(f).toMatchObject({ status: "ok", calendars: 3, found: [{ calendar: "Old", title: "Pay rent", start: "2026-01-01", repeats: true }] });
   });
 
   it("asks to re-link when the old connection lacks read access", async () => {

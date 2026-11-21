@@ -12,6 +12,11 @@ async function Notifications({ searchParams }: { searchParams: Promise<Record<st
   return <NotificationsCard saved={sp.push === "saved"} />;
 }
 
+async function CalendarsWithSearch({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  return <GoogleCalendarsList find={typeof sp.find === "string" ? sp.find : undefined} />;
+}
+
 export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-4">
@@ -28,7 +33,7 @@ export default function SettingsPage({ searchParams }: PageProps<"/settings">) {
         <CalendarCard searchParams={searchParams} />
       </Suspense>
       <Suspense fallback={null}>
-        <GoogleCalendarsList />
+        <CalendarsWithSearch searchParams={searchParams} />
       </Suspense>
       <Suspense fallback={null}>
         <Notifications searchParams={searchParams} />
