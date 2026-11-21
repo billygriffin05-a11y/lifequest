@@ -3,7 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { londonDateKey } from "@/features/honour/rules";
-import { BOX_INTERVALS, STUDY_DAY_MIN_REVIEWS, STUDY_DAY_XP } from "@/features/mind/rules";
+import { STUDY_DAY_MIN_REVIEWS, STUDY_DAY_XP } from "@/features/mind/rules";
+import { GRADES } from "@/features/mind/fsrs";
 import { addCardAction, archiveCardAction, reviewCardAction, seedDeckAction } from "@/features/mind/server/actions";
 import { getCardStats, listCards } from "@/features/mind/server/service";
 import { prisma } from "@/server/db/client";
@@ -67,22 +68,28 @@ async function Cards({ searchParams }: { searchParams: Promise<Record<string, st
               <p className="mt-3 text-silver-100" data-testid="card-answer">
                 {next.back}
               </p>
-              <p className="mt-3 text-sm text-silver-300">Did you get it?</p>
-              <form action={reviewCardAction} className="mt-2 flex flex-wrap gap-2">
+              <p className="mt-3 text-sm text-silver-300">How well did you remember it?</p>
+              <form action={reviewCardAction} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <input type="hidden" name="id" value={next.id} />
-                <button type="submit" name="result" value="right" className={primary}>
-                  ✓ Got it
-                </button>
-                <button type="submit" name="result" value="wrong" className={`${btn} border border-ember-500/50 text-ember-300`}>
-                  ✗ Missed it
-                </button>
+                {GRADES.map(({ grade, label }) => (
+                  <button
+                    key={grade}
+                    type="submit"
+                    name="grade"
+                    value={grade}
+                    className={grade === 1 ? `${btn} border border-ember-500/50 text-ember-300` : grade === 3 ? primary : `${btn} border border-emerald-500/50 text-emerald-300`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </form>
             </details>
           </article>
         )}
 
         <p className="mt-4 text-xs text-silver-300">
-          Right answers move a card up a box and it comes back later ({BOX_INTERVALS.join(", ")} days); misses go back to box 1 for tomorrow.{" "}
+          Scheduling uses FSRS (as in modern Anki): each card comes back just before you&apos;d forget it, aiming for 90% recall. Again
+          brings it back tomorrow; Easy pushes it furthest.{" "}
           {STUDY_DAY_MIN_REVIEWS}+ reviews in a day gives Study +{STUDY_DAY_XP} XP.
         </p>
         {stats.total > 0 && (
@@ -164,6 +171,9 @@ export default function CardsPage({ searchParams }: PageProps<"/mind/cards">) {
         </Link>
         <Link href="/dragons/study" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           Study dragon
+        </Link>
+        <Link href="/mind/exam" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
+          Mock exam
         </Link>
       </nav>
       <h1 className="mb-4 font-display text-4xl font-bold tracking-wide text-gold-300">Security+ cards</h1>

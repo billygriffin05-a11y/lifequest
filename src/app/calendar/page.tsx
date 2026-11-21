@@ -7,6 +7,8 @@ import { LifequestDayDetail } from "@/features/calendar/components/lifequest-day
 import { groupByDay, type CalEvent } from "@/features/calendar/google/event-mapping";
 import { DAY_RE, describeDay, monthGrid, shiftMonth, type DayActivity } from "@/features/calendar/month";
 import { getActivityByDay } from "@/features/calendar/server/agenda";
+import { occurrences } from "@/features/finance/recurring";
+import { getRecurring } from "@/features/finance/server/service";
 import { getGoogleEvents, type GoogleEventsResult } from "@/features/calendar/server/google-events";
 import { calendarDeps } from "@/features/calendar/server/runtime";
 import { weekStart } from "@/features/honour/progress";
@@ -200,8 +202,25 @@ async function CalendarView({ searchParams }: { searchParams: Promise<Record<str
     next = addDays(day, 1);
   }
 
-  const [activity, google] = await Promise.all([getActivityByDay(prisma, from, to), getGoogleEvents(calendarDeps(), from, to)]);
-  const events = groupByDay(google.events);
+  const [activity, google, bills] = await Promise.all([
+    getActivityByDay(prisma, from, to),
+    getGoogleEvents(calendarDeps(), from, to),
+    getRecurring(prisma, today),
+  ]);
+  // Expected bill payments (detected from spending) appear as all-day "Bills" entries.
+  const billEvents: CalEvent[] = bills.flatMap((b) =>
+    occurrences(b, from, to).map((day) => ({
+      id: `bill:${b.payee}:${day}`,
+      title: `💷 ${b.payee}`,
+      calendar: "Bills",
+      colour: null,
+      day,
+      allDay: true,
+      start: null,
+      end: null,
+    })),
+  );
+  const events = groupByDay([...google.events, ...billEvents]);
   const unit = view === "month" ? "month" : view === "week" ? "week" : "day";
 
   return (

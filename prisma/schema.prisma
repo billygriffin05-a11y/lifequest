@@ -316,6 +316,10 @@ model Flashcard {
   back       String
   box        Int          @default(1)
   dueOn      String
+  /// FSRS memory state (null until first FSRS review). Days / 1–10.
+  stability  Float?
+  difficulty Float?
+  lastReviewOn String?
   /// Stable key for starter cards so re-seeding never duplicates.
   seedKey    String?      @unique
   archivedAt DateTime?
@@ -331,6 +335,8 @@ model CardReview {
   card      Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   day       String
   correct   Boolean
+  /// FSRS grade: 1 Again, 2 Hard, 3 Good, 4 Easy (null for older Leitner reviews).
+  grade     Int?
   createdAt DateTime  @default(now())
 
   @@index([day])
@@ -380,4 +386,16 @@ model WeeklyReview {
   obstacle  String   @default("")
   change    String   @default("")
   updatedAt DateTime @updatedAt
+}
+
+/// A finished Security+ mock exam (self-marked). Per-topic results as JSON.
+model MockExam {
+  id          String   @id @default(cuid())
+  takenOn     String
+  durationSec Int
+  total       Int
+  correct     Int
+  /// [{ "topic": string, "total": number, "correct": number }]
+  byTopic     String
+  createdAt   DateTime @default(now())
 }

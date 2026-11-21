@@ -56,7 +56,8 @@ test("security+ cards: seed, reveal, review", async ({ page }) => {
     await card.getByText("Show answer").click();
     await expect(page.getByTestId("card-answer")).toBeVisible();
     expect((await axe(page)).violations).toEqual([]);
-    await card.getByRole("button", { name: "✓ Got it" }).click();
+    await expect(card.getByRole("button")).toHaveText(["Again", "Hard", "Good", "Easy"]);
+    await card.getByRole("button", { name: "Good" }).click();
     await expect(page.getByTestId("card-under-review").or(page.getByTestId("all-done"))).toBeVisible();
     await expect(page.getByTestId("card-under-review").locator("p").nth(1)).not.toHaveText(question ?? "");
   } else {

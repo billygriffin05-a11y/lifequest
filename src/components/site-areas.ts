@@ -25,5 +25,6 @@ export const MORE_AREAS: readonly SiteArea[] = [
   { href: "/search", icon: "search", label: "Search" },
   { href: "/honour/history", icon: "heatmap", label: "Habit heatmap" },
   { href: "/mind/cards", icon: "mind", label: "Security+ cards" },
+  { href: "/mind/exam", icon: "report", label: "Security+ mock exam" },
   { href: "/dragons/gallery", icon: "dragons", label: "Dragon gallery" },
 ];

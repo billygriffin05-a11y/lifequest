@@ -14,7 +14,7 @@ import {
   importCsvAction,
   saveCategoryAction,
 } from "@/features/finance/server/actions";
-import { getBudgetRewardMonths, getMonthOverview, listCategories, listGoals } from "@/features/finance/server/service";
+import { getBudgetRewardMonths, getMonthOverview, getRecurring, listCategories, listGoals } from "@/features/finance/server/service";
 import { londonDateKey } from "@/features/honour/rules";
 import { prisma } from "@/server/db/client";
 
@@ -219,6 +219,11 @@ async function Money({ searchParams }: { searchParams: Promise<Record<string, st
         </section>
       </div>
 
+      {/* Bills & subscriptions */}
+      <Suspense fallback={null}>
+        <Bills />
+      </Suspense>
+
       {/* Transactions */}
       <section aria-labelledby="tx-heading" className={card}>
         <h2 id="tx-heading" className="font-display text-xl text-gold-300">
@@ -388,6 +393,47 @@ async function Money({ searchParams }: { searchParams: Promise<Record<string, st
         </section>
       </div>
     </div>
+  );
+}
+
+const billDay = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const CADENCE = { weekly: "weekly", monthly: "monthly", yearly: "yearly" } as const;
+
+/** Repeating payments spotted in your spending, with yearly totals and next due date. */
+async function Bills() {
+  await connection();
+  const bills = await getRecurring(prisma, londonDateKey(new Date()));
+  const yearly = bills.reduce((n, b) => n + b.yearlyPence, 0);
+  return (
+    <section aria-labelledby="bills-heading" className="rounded-2xl border border-obsidian-600 bg-obsidian-900/80 p-5" data-testid="bills">
+      <h2 id="bills-heading" className="font-display text-xl text-gold-300">
+        Bills &amp; subscriptions
+      </h2>
+      {bills.length === 0 ? (
+        <p className="mt-2 text-sm text-silver-300">
+          Nothing repeating found yet. After a few months of spending (or a bank CSV import), regular payments show up here.
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-sm text-silver-300">
+            Spotted from your spending. About <strong className="text-silver-100">{formatPence(yearly)}</strong> a year in total. Next due dates also show on
+            your Calendar.
+          </p>
+          <ul className="mt-3 divide-y divide-obsidian-700 text-sm">
+            {bills.map((b) => (
+              <li key={b.payee} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <span className="min-w-0 flex-1 truncate text-silver-100">{b.payee}</span>
+                <span className="text-silver-300">
+                  {formatPence(b.amountPence)} {CADENCE[b.cadence]}
+                </span>
+                <span className="w-28 text-right text-silver-300">{formatPence(b.yearlyPence)}/yr</span>
+                <span className="w-24 text-right text-emerald-300">next {billDay.format(new Date(`${b.nextOn}T12:00:00Z`))}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
 
