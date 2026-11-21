@@ -1,26 +1,15 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { TodayPanel } from "@/features/dashboard/components/today-panel";
-import { PixelIcon, type IconName } from "@/components/ui/pixel-icon";
+import { AREAS } from "@/components/site-areas";
+import { PixelIcon } from "@/components/ui/pixel-icon";
 import { HomeRank } from "@/features/honour/components/home-rank";
 import { HomeHero } from "@/features/treasury/components/home-hero";
 
-const AREAS: { href: string; icon: IconName; label: string }[] = [
-  { href: "/honour", icon: "honour", label: "Honour" },
-  { href: "/dragons", icon: "dragons", label: "Dragons" },
-  { href: "/money", icon: "money", label: "Money" },
-  { href: "/body", icon: "body", label: "Body" },
-  { href: "/mind", icon: "mind", label: "Mind" },
-  { href: "/report", icon: "report", label: "Weekly report" },
-  { href: "/shop", icon: "shop", label: "Shop" },
-  { href: "/achievements", icon: "achievements", label: "Achievements" },
-  { href: "/calendar", icon: "calendar", label: "Calendar" },
-  { href: "/settings", icon: "settings", label: "Settings" },
-];
 
 export default function Home() {
   return (
-    <main className="flex flex-1 justify-center px-4 pb-16 pt-[max(2.5rem,env(safe-area-inset-top))]">
+    <main className="flex flex-1 justify-center px-4 pb-16 pt-6">
       <section className="w-full max-w-2xl rounded-2xl border border-gold-500/30 bg-obsidian-900/80 p-6 text-center shadow-[0_0_60px_-20px_var(--color-emerald-500)] sm:p-8">
         <h1 className="font-display text-4xl font-bold tracking-wide text-gold-300 sm:text-5xl">LIFEQUEST</h1>
         <p className="mt-3 text-silver-300">Your life, forged into an epic quest.</p>
