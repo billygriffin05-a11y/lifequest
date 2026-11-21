@@ -45,6 +45,16 @@ export const actionInputSchema = z
         .max(7, "Weekly goal must be 1–7")
         .nullable(),
     ).optional(),
+    /** Optional if-then plan cue, e.g. "After my morning coffee". */
+    cue: z.preprocess(
+      (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+      z.string().trim().max(80, "Keep the cue under 80 characters").nullable(),
+    ).optional(),
+    /** Optional reminder time for the plan, HH:MM. */
+    cueTime: z.preprocess(
+      (v) => (v === "" || v === undefined ? null : v),
+      z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Pick a time like 07:30").nullable(),
+    ).optional(),
   })
   .strict();
 /** What callers may pass (weeklyTarget optional); the service parses it. */

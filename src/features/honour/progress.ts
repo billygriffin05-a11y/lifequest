@@ -58,6 +58,71 @@ export function runLengths(days: ReadonlySet<string>): number[] {
   return runs;
 }
 
+// ── Forgiving streaks: shields ───────────────────────────────────────────────
+
+/** A shield is earned for every 7 days in a row; at most this many are banked. */
+export const SHIELD_EVERY = 7;
+export const MAX_SHIELDS = 2;
+
+export interface StreakTimeline {
+  /** Current streak in done days (shield-covered days don't count as done). */
+  current: number;
+  /** Longest streak ever, in done days. */
+  best: number;
+  /** Shields banked right now. */
+  shields: number;
+  /** Done-day count of every streak (for bonus XP). */
+  runs: number[];
+  /** Days a shield covered. */
+  covered: string[];
+}
+
+/**
+ * Walk day by day from the first done day to today. A single missed day is
+ * covered by a banked shield (the streak survives); a second miss in a row,
+ * or a miss with no shield, ends the streak and its shields. Today not being
+ * done yet never breaks anything (you have until midnight).
+ */
+export function streakTimeline(days: ReadonlySet<string>, todayKey: string): StreakTimeline {
+  const sorted = [...days].filter((d) => d <= todayKey).sort();
+  if (!sorted.length) return { current: 0, best: 0, shields: 0, runs: [], covered: [] };
+  const runs: number[] = [];
+  const covered: string[] = [];
+  let run = 0;
+  let sinceShield = 0;
+  let shields = 0;
+  let missed = 0;
+  const end = toUtc(todayKey);
+  for (let ms = toUtc(sorted[0]); ms <= end; ms += DAY) {
+    const key = fromUtc(ms);
+    if (days.has(key)) {
+      run++;
+      sinceShield++;
+      missed = 0;
+      if (sinceShield === SHIELD_EVERY) {
+        shields = Math.min(MAX_SHIELDS, shields + 1);
+        sinceShield = 0;
+      }
+      continue;
+    }
+    if (key === todayKey) break;
+    missed++;
+    if (missed === 1 && shields > 0 && run > 0) {
+      shields--;
+      covered.push(key);
+      continue;
+    }
+    if (run > 0) runs.push(run);
+    run = 0;
+    sinceShield = 0;
+    shields = 0;
+  }
+  if (run > 0) runs.push(run);
+  // The last run is "current" only if it reaches yesterday/today (possibly via a shield).
+  const alive = run > 0;
+  return { current: alive ? run : 0, best: Math.max(0, ...runs), shields: alive ? shields : 0, runs, covered };
+}
+
 export const STREAK_BONUS = { every7: 25, every30: 100 } as const;
 
 /** Bonus XP for one run: +25 for every full 7 days, +100 more for every full 30. */
@@ -104,6 +169,8 @@ export interface StreakInfo {
   /** Days done this week (Mon–Sun). */
   thisWeek: number;
   weeksMet: number;
+  /** Streak shields banked. */
+  shields: number;
 }
 
 export function streaksByAction(
@@ -114,12 +181,13 @@ export function streaksByAction(
   const out = new Map<string, StreakInfo>();
   const thisMonday = weekStart(todayKey);
   for (const [actionId, { days, category }] of goodDaysByAction(rows)) {
-    const runs = runLengths(days);
+    const tl = streakTimeline(days, todayKey);
     const weekly = weeklyBonus(days, targets.get(actionId) ?? null);
     out.set(actionId, {
-      current: currentStreak(days, todayKey),
-      best: Math.max(0, ...runs),
-      bonusXp: runs.reduce((n, len) => n + bonusForRun(len), 0) + weekly.bonusXp,
+      current: tl.current,
+      best: tl.best,
+      shields: tl.shields,
+      bonusXp: tl.runs.reduce((n, len) => n + bonusForRun(len), 0) + weekly.bonusXp,
       category,
       thisWeek: daysPerWeek(days).get(thisMonday) ?? 0,
       weeksMet: weekly.weeksMet,

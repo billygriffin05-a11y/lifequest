@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   poweredByHeader: false,
   // Native SQLite driver must not be bundled.
-  serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3"],
+  serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3", "web-push"],
   turbopack: {
     rules: {
       "*.css": {
