@@ -4,7 +4,9 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { AREAS } from "@/features/dragons/areas";
 import { DragonSprite } from "@/features/dragons/components/dragon-sprite";
-import { CATALOG } from "@/features/treasury/catalog";
+import { londonDateKey } from "@/features/honour/rules";
+import { CATALOG, REGULAR_ITEMS, type ShopItem } from "@/features/treasury/catalog";
+import { SEASONS, seasonEnds, seasonFor } from "@/features/treasury/seasons";
 import { buyItemAction, equipItemAction } from "@/features/treasury/server/actions";
 import { getTreasury } from "@/features/treasury/server/service";
 import { prisma } from "@/server/db/client";
@@ -12,6 +14,7 @@ import { prisma } from "@/server/db/client";
 export const metadata: Metadata = { title: "Treasure Shop · LIFEQUEST" };
 
 const num = new Intl.NumberFormat("en-GB");
+const endFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", timeZone: "UTC" });
 const btn =
   "inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50";
 
@@ -22,21 +25,7 @@ async function Shop({ searchParams }: { searchParams: Promise<Record<string, str
   const t = await getTreasury(prisma);
   const preview = AREAS[0];
 
-  return (
-    <>
-      <p className="mb-4 text-lg text-silver-100" data-testid="gold">
-        🪙 <strong className="text-gold-300">{num.format(t.balance)}</strong> gold
-        <span className="ml-2 text-sm text-silver-300">
-          (earned {num.format(t.earned)} · spent {num.format(t.spent)})
-        </span>
-      </p>
-      {result && (
-        <p role="status" className={`mb-4 rounded-lg border px-3 py-2 text-sm ${result === "bought" ? "border-emerald-500/40 text-emerald-300" : "border-ember-500/40 text-ember-300"}`}>
-          {result === "bought" ? "Purchased! Equip it on any dragon below." : decodeURIComponent(result.replace(/^error:/, ""))}
-        </p>
-      )}
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Shop items">
-        {CATALOG.map((item) => {
+  const card = (item: ShopItem) => {
           const owned = t.owned.has(item.id);
           return (
             <li key={item.id} className="flex flex-col rounded-2xl border border-obsidian-600 bg-obsidian-900/80 p-4" data-testid={`item-${item.id}`}>
@@ -90,7 +79,36 @@ async function Shop({ searchParams }: { searchParams: Promise<Record<string, str
               )}
             </li>
           );
-        })}
+  };
+
+  const today = londonDateKey(new Date());
+  const season = seasonFor(today);
+  const seasonal = CATALOG.filter((i) => i.season && (i.season === season || t.owned.has(i.id)));
+
+  return (
+    <>
+      <p className="mb-4 text-lg text-silver-100" data-testid="gold">
+        🪙 <strong className="text-gold-300">{num.format(t.balance)}</strong> gold
+        <span className="ml-2 text-sm text-silver-300">
+          (earned {num.format(t.earned)} · spent {num.format(t.spent)})
+        </span>
+      </p>
+      {result && (
+        <p role="status" className={`mb-4 rounded-lg border px-3 py-2 text-sm ${result === "bought" ? "border-emerald-500/40 text-emerald-300" : "border-ember-500/40 text-ember-300"}`}>
+          {result === "bought" ? "Purchased! Equip it on any dragon below." : decodeURIComponent(result.replace(/^error:/, ""))}
+        </p>
+      )}
+      <section aria-labelledby="season-heading" className="mb-6 rounded-2xl border border-gold-500/50 bg-obsidian-900/80 p-4" data-testid="season">
+        <h2 id="season-heading" className="font-display text-xl text-gold-300">
+          {SEASONS[season].icon} {SEASONS[season].festival}
+        </h2>
+        <p className="text-sm text-silver-300">Limited item — on sale until {endFmt.format(new Date(`${seasonEnds(today)}T12:00:00Z`))}. Seasonal items you own stay yours.</p>
+        <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Seasonal items">
+          {seasonal.map(card)}
+        </ul>
+      </section>
+      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Shop items">
+        {REGULAR_ITEMS.map(card)}
       </ul>
       <p className="mt-6 text-sm text-silver-300">
         Earn gold from good deeds (1 per Honour point), half of all bonus XP, and 50 for every weekly boss you defeat. To take

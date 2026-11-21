@@ -35,6 +35,8 @@ import {
 import { getBodyRewards } from "@/features/body/server/service";
 import { getBudgetRewardMonths } from "@/features/finance/server/service";
 import { getMindRewards } from "@/features/mind/server/service";
+import { getReviewRewardWeeks, REVIEW_XP } from "@/features/report/server/review";
+import { getActivityDamageByWeek } from "./activity";
 import { BUDGET_REWARD_XP } from "@/features/finance/money";
 import { actionInputSchema, type ActionInput, type ActionKind } from "../schemas";
 import { STARTER_ACTIONS } from "../starter-actions";
@@ -416,13 +418,14 @@ async function questCandidates(db: Db) {
 /** All bonus XP by category: streaks, weekly targets and completed daily quests. */
 async function bonusByCategory(db: Db, now: Date) {
   const today = londonDateKey(now);
-  const [rows, targets, candidates, budgetMonths, bodyRewards, mindRewards] = await Promise.all([
+  const [rows, targets, candidates, budgetMonths, bodyRewards, mindRewards, reviewWeeks] = await Promise.all([
     ledgerFacts(db),
     weeklyTargets(db),
     questCandidates(db),
     getBudgetRewardMonths(db, today.slice(0, 7)),
     getBodyRewards(db),
     getMindRewards(db),
+    getReviewRewardWeeks(db),
   ]);
   const streakMap = streaksByAction(rows, today, targets);
   const byCategory = new Map<string, number>();
@@ -436,6 +439,8 @@ async function bonusByCategory(db: Db, now: Date) {
   for (const [c, b] of bodyRewards) byCategory.set(c, (byCategory.get(c) ?? 0) + b);
   // Reading, card reviews, focus time and journalling grow Reading, Study and Habits.
   for (const [c, b] of mindRewards) byCategory.set(c, (byCategory.get(c) ?? 0) + b);
+  // Each completed weekly review grows the Habits dragon.
+  if (reviewWeeks) byCategory.set("Habits", (byCategory.get("Habits") ?? 0) + reviewWeeks * REVIEW_XP);
   return { rows, targets, candidates, streakMap, byCategory, today };
 }
 
@@ -443,10 +448,15 @@ export async function getPlayerProgress(db: Db, now = new Date()): Promise<Playe
   const { rows, targets, candidates, streakMap, byCategory, today } = await bonusByCategory(db, now);
   const baseXp = rows.reduce((n, r) => n + r.xpDelta, 0);
   const weeks = honourByWeek(rows);
+  const activity = await getActivityDamageByWeek(db);
   let bossWins = 0;
-  for (const [w, h] of weeks) if (w <= weekStart(today) && bossBattle(w, h.good, h.bad).defeated) bossWins++;
+  for (const w of new Set([...weeks.keys(), ...activity.keys()])) {
+    if (w > weekStart(today)) continue;
+    const h = weeks.get(w) ?? { good: 0, bad: 0 };
+    if (bossBattle(w, h.good, h.bad, activity.get(w)).defeated) bossWins++;
+  }
   const thisWeek = weeks.get(weekStart(today)) ?? { good: 0, bad: 0 };
-  const boss = bossBattle(weekStart(today), thisWeek.good, thisWeek.bad);
+  const boss = bossBattle(weekStart(today), thisWeek.good, thisWeek.bad, activity.get(weekStart(today)));
   const goodHonour = rows.filter((r) => r.kind === "good").reduce((n, r) => n + r.honourDelta, 0);
   const bonusXp = [...byCategory.values()].reduce((a, b) => a + b, 0) + bossWins * BOSS_XP_REWARD;
   const streaks: Record<string, number> = {};

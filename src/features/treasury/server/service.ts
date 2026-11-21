@@ -3,6 +3,8 @@ import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { AREAS } from "@/features/dragons/areas";
 import { getPlayerProgress } from "@/features/honour/server/service";
 import { CATALOG, itemById } from "../catalog";
+import { SEASONS, seasonFor } from "../seasons";
+import { londonDateKey } from "@/features/honour/rules";
 import { canAfford, goldBalance, goldEarned } from "../rules";
 
 export class TreasuryError extends Error {}
@@ -42,6 +44,9 @@ export async function buyItem(db: PrismaClient, rawItemId: string, now = new Dat
   const item = itemById(itemId)!;
   const t = await getTreasury(db, now);
   if (t.owned.has(itemId)) throw new TreasuryError("You already own that.");
+  if (item.season && seasonFor(londonDateKey(now)) !== item.season) {
+    throw new TreasuryError(`${item.name} is only sold during the ${SEASONS[item.season].festival}.`);
+  }
   if (!canAfford(t.balance, item.price)) throw new TreasuryError(`Not enough gold — you need ${item.price - t.balance} more.`);
   try {
     await db.purchase.create({ data: { itemId, price: item.price } });

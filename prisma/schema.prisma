@@ -89,6 +89,8 @@ model DragonProfile {
   customName String?
   /// Equipped cosmetic item id from the treasure shop (see src/features/treasury/catalog.ts).
   accessory  String?
+  /// Evolution path chosen from stage 10: "armoured" | "swift" (null = undecided).
+  path       String?
   updatedAt  DateTime @updatedAt
 }
 
@@ -369,4 +371,13 @@ model PushSubscription {
 model PushLog {
   key       String   @id
   createdAt DateTime @default(now())
+}
+
+/// Sunday weekly review: three short reflections per week (keyed by the Monday).
+model WeeklyReview {
+  weekStart String   @id
+  win       String   @default("")
+  obstacle  String   @default("")
+  change    String   @default("")
+  updatedAt DateTime @updatedAt
 }

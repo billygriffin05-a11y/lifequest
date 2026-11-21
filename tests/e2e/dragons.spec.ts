@@ -7,7 +7,7 @@ test("the lair shows all eight area dragons with growth and mood", async ({ page
   await page.goto("/dragons");
   await expect(page.getByRole("heading", { level: 1, name: "Dragon Lair" })).toBeVisible();
   for (const name of NAMES) await expect(page.getByRole("heading", { level: 2, name })).toBeVisible();
-  await expect(page.getByRole("progressbar")).toHaveCount(8);
+  await expect(page.getByRole("progressbar", { name: /growth/i })).toHaveCount(8);
   await expect(page.getByRole("img", { name: /Emberclaw, the Fire dragon of Fitness/ })).toBeVisible();
   for (const element of ["Fire", "Earth", "Lightning", "Plasma", "Water", "Ice", "Air", "Shadow"]) {
     await expect(page.getByText(`${element} dragon of`)).toBeVisible();

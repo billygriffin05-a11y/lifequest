@@ -311,6 +311,8 @@ export interface BossBattle {
   hp: number;
   /** Good-deed Honour dealt this week. */
   damage: number;
+  /** Extra damage from training, wellbeing and study this week. */
+  activity: ActivityDamage;
   /** Bad-habit Honour healed this week. */
   healed: number;
   hpLeft: number;
@@ -321,20 +323,66 @@ export function bossForWeek(weekKey: string) {
   return BOSSES[hash(`boss:${weekKey}`) % BOSSES.length];
 }
 
-/** Good deeds hit the boss; bad habits heal it. Defeated when net damage ≥ HP. */
-export function bossBattle(weekKey: string, goodHonour: number, badHonour: number): BossBattle {
+/** Good deeds and training hit the boss; bad habits heal it. Defeated when net damage ≥ HP. */
+export function bossBattle(weekKey: string, goodHonour: number, badHonour: number, activity: ActivityDamage = NO_ACTIVITY): BossBattle {
   const boss = bossForWeek(weekKey);
-  const net = Math.max(0, goodHonour - badHonour);
+  const net = Math.max(0, goodHonour + activity.total - badHonour);
   return {
     weekStart: weekKey,
     name: boss.name,
     emoji: boss.emoji,
     hp: BOSS_HP,
     damage: goodHonour,
+    activity,
     healed: badHonour,
     hpLeft: Math.max(0, BOSS_HP - net),
     defeated: net >= BOSS_HP,
   };
+}
+
+// ── Training damage (body + mind activity) ───────────────────────────────────
+
+export const ACTIVITY_DAMAGE = { workoutDay: 15, run: 15, waterDay: 5, sleepNight: 5, focus25: 5, reviews10: 5 } as const;
+
+export interface ActivityFacts {
+  workoutDays: Iterable<string>;
+  runs: Iterable<string>;
+  waterDays: Iterable<string>;
+  sleepNights: Iterable<string>;
+  focus: Iterable<{ day: string; minutes: number }>;
+  reviewDays: Iterable<string>;
+}
+
+export interface ActivityDamage {
+  total: number;
+  training: number; // workouts + runs
+  wellbeing: number; // water + sleep
+  study: number; // focus + card reviews
+}
+
+export const NO_ACTIVITY: ActivityDamage = { total: 0, training: 0, wellbeing: 0, study: 0 };
+
+/** Boss damage per week (keyed by Monday) from body and mind activity. */
+export function activityDamageByWeek(f: ActivityFacts): Map<string, ActivityDamage> {
+  const out = new Map<string, ActivityDamage>();
+  const add = (day: string, part: "training" | "wellbeing" | "study", n: number) => {
+    const w = weekStart(day);
+    const cur = out.get(w) ?? { ...NO_ACTIVITY };
+    cur[part] += n;
+    cur.total += n;
+    out.set(w, cur);
+  };
+  for (const d of new Set(f.workoutDays)) add(d, "training", ACTIVITY_DAMAGE.workoutDay);
+  for (const d of f.runs) add(d, "training", ACTIVITY_DAMAGE.run);
+  for (const d of new Set(f.waterDays)) add(d, "wellbeing", ACTIVITY_DAMAGE.waterDay);
+  for (const d of new Set(f.sleepNights)) add(d, "wellbeing", ACTIVITY_DAMAGE.sleepNight);
+  const focusByDay = new Map<string, number>();
+  for (const x of f.focus) focusByDay.set(x.day, (focusByDay.get(x.day) ?? 0) + x.minutes);
+  for (const [d, m] of focusByDay) if (m >= 25) add(d, "study", Math.floor(m / 25) * ACTIVITY_DAMAGE.focus25);
+  const reviewsByDay = new Map<string, number>();
+  for (const d of f.reviewDays) reviewsByDay.set(d, (reviewsByDay.get(d) ?? 0) + 1);
+  for (const [d, n] of reviewsByDay) if (n >= 10) add(d, "study", Math.floor(n / 10) * ACTIVITY_DAMAGE.reviews10);
+  return out;
 }
 
 /** Per-week good/bad Honour (undo-netted) from ledger rows. */

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { PLANS } from "@/features/dragons/body-plans";
+import { setDragonPathAction } from "@/features/dragons/server/actions";
+import { PATH_STAGE, PATHS, PLANS } from "@/features/dragons/body-plans";
 import { DragonSprite } from "@/features/dragons/components/dragon-sprite";
 import { RenameForm } from "@/features/dragons/components/rename-form";
 import { MOOD_HINT, MOOD_TEXT, STAGE_COUNT } from "@/features/dragons/rules";
@@ -51,6 +52,7 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
             element={dragon.area.element}
             palette={dragon.area.palette}
             accessory={dragon.accessory}
+            path={dragon.path}
             label={`${dragon.displayName}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
             className="aspect-[7/5] w-full"
           />
@@ -77,6 +79,35 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
             Mood: <strong>{MOOD_TEXT[mood]}</strong>
           </p>
           <p className="text-sm text-silver-300">{MOOD_HINT[mood]}</p>
+          <section aria-labelledby="path-heading" className="mt-5 rounded-xl border border-obsidian-600 p-3" data-testid="evolution-path">
+            <h3 id="path-heading" className="font-display text-lg text-gold-300">
+              Evolution path
+            </h3>
+            {growth.stage < PATH_STAGE ? (
+              <p className="text-sm text-silver-300">At stage {PATH_STAGE + 1} you&apos;ll choose how {dragon.displayName} evolves.</p>
+            ) : (
+              <form action={setDragonPathAction} className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input type="hidden" name="areaId" value={dragon.area.id} />
+                {(Object.keys(PATHS) as (keyof typeof PATHS)[]).map((p) => (
+                  <button
+                    key={p}
+                    type="submit"
+                    name="path"
+                    value={p}
+                    aria-pressed={dragon.path === p}
+                    className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm ${
+                      dragon.path === p ? "border-gold-400 bg-gold-500/15 text-gold-300" : "border-obsidian-600 text-silver-100 hover:border-emerald-400"
+                    }`}
+                  >
+                    <span className="block font-semibold">
+                      {PATHS[p].icon} {PATHS[p].name}
+                    </span>
+                    <span className="block text-xs text-silver-300">{PATHS[p].blurb}</span>
+                  </button>
+                ))}
+              </form>
+            )}
+          </section>
           <div className="mt-5">
             <RenameForm areaId={dragon.area.id} current={dragon.customName} defaultName={dragon.area.dragonName} />
           </div>

@@ -15,7 +15,7 @@
  * Deterministic: same (stage, mood, element) → same pixels.
  */
 import type { Element, PaletteRole } from "./areas";
-import { PLANS, type BodyPlan } from "./body-plans";
+import { planFor, type BodyPlan, type EvolutionPath } from "./body-plans";
 import { UNLOCKS, type Mood } from "./rules";
 
 export const GRID_W = 56;
@@ -422,7 +422,7 @@ function drawTail(g: Grid, plan: BodyPlan, stage: number, k: number, [tx0, ty0]:
 function drawBack(g: Grid, plan: BodyPlan, stage: number, bx: number, by: number, brx: number, bry: number) {
   if (stage < UNLOCKS.spines || plan.back === "none") return;
   const topAt = (sx: number) => by - bry * Math.sqrt(Math.max(0, 1 - ((sx - bx) / brx) ** 2)) + 0.5;
-  const grow = (stage - UNLOCKS.spines) * 0.15 * (stage >= UNLOCKS.regal ? 1.7 : 1);
+  const grow = (stage - UNLOCKS.spines) * 0.15 * (stage >= UNLOCKS.regal ? 1.7 : 1) * (plan.armour ?? 1);
   const count = Math.min(7, 3 + Math.floor((stage - UNLOCKS.spines) / 2));
   const at = (i: number, n = count) => bx - brx * 0.75 + ((i + 0.5) / n) * brx * 1.35;
   switch (plan.back) {
@@ -782,7 +782,7 @@ function motes(element: Element, stage: number): Particle[] {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-function build(stage: number, mood: Mood, element: Element): SpriteLayers {
+function build(stage: number, mood: Mood, element: Element, path: EvolutionPath | null): SpriteLayers {
   const g = makeGrid();
   const w = makeGrid();
   const b = makeGrid();
@@ -808,7 +808,7 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
     drawEgg(g, "hatching");
     addOutline(g);
   } else {
-    const r = drawDragon(g, w, sh, stage, mood, PLANS[element]);
+    const r = drawDragon(g, w, sh, stage, mood, planFor(element, stage, path));
     flying = r.flying;
     eyes = r.eyes;
     head = r.head;
@@ -829,12 +829,12 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
 const cache = new Map<string, SpriteLayers>();
 
 /** All animation layers for a dragon. Cached; safe to call often. */
-export function spriteLayers(stage: number, mood: Mood, element: Element): SpriteLayers {
+export function spriteLayers(stage: number, mood: Mood, element: Element, path: EvolutionPath | null = null): SpriteLayers {
   const s = Math.min(19, Math.max(0, Math.floor(stage)));
-  const key = `${s}:${mood}:${element}`;
+  const key = `${s}:${mood}:${element}:${path ?? "-"}`;
   let layers = cache.get(key);
   if (!layers) {
-    layers = build(s, mood, element);
+    layers = build(s, mood, element, path);
     cache.set(key, layers);
   }
   return layers;

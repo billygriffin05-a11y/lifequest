@@ -27,7 +27,11 @@ export interface ShopItem {
   description: string;
   pixels: readonly string[];
   lift?: number;
+  /** Limited: only buyable during this season (see seasons.ts). */
+  season?: Season;
 }
+
+import type { Season } from "./seasons";
 
 export const CATALOG: readonly ShopItem[] = [
   { id: "party-hat", name: "Party Hat", icon: "🥳", price: 80, description: "For every small victory.", pixels: ["..r..", ".rbr.", "rbrbr"] },
@@ -38,7 +42,15 @@ export const CATALOG: readonly ShopItem[] = [
   { id: "viking-helm", name: "Viking Helm", icon: "🪖", price: 180, description: "Horned steel for battle.", pixels: ["w.....w", "w.sss.w", ".sssss."] },
   { id: "halo", name: "Halo", icon: "😇", price: 200, description: "A glowing ring of pure Honour.", pixels: [".yyyy.", "y....y", ".yyyy."], lift: 2 },
   { id: "flame-crest", name: "Flame Crest", icon: "🔥", price: 220, description: "A living crown of fire.", pixels: [".o.o.o.", "oroooro", ".rrrrr."] },
+  // Seasonal (limited) — only for sale during their festival.
+  { id: "snow-cap", name: "Snow Cap", icon: "❄️", price: 140, season: "winter", description: "Frost Festival exclusive.", pixels: ["..w..", ".bbb.", "bbbbb", "wwwww"] },
+  { id: "bloom-wreath", name: "Bloom Wreath", icon: "🌼", price: 140, season: "spring", description: "Bloom Trial exclusive.", pixels: ["P.y.P", "LPLPL"] },
+  { id: "sun-shades", name: "Sun Shades", icon: "😎", price: 140, season: "summer", description: "Sun Tournament exclusive.", pixels: ["kkk.kkk", "kyk.kyk"] },
+  { id: "harvest-leaf", name: "Harvest Leaf", icon: "🍂", price: 140, season: "autumn", description: "Harvest Hunt exclusive.", pixels: ["..o..", ".oro.", "..G.."] },
 ];
+
+/** Always-available items. */
+export const REGULAR_ITEMS = CATALOG.filter((i) => !i.season);
 
 export function itemById(id: string | null | undefined): ShopItem | undefined {
   return CATALOG.find((i) => i.id === id);

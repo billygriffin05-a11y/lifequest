@@ -28,6 +28,8 @@ export interface BodyPlan {
   wing: WingStyle;
   wingSpan: number;
   horns: HornStyle;
+  /** Extra back-armour growth (Armoured path). */
+  armour?: number;
 }
 
 export const PLANS: Record<Element, BodyPlan> = {
@@ -72,3 +74,26 @@ export const PLANS: Record<Element, BodyPlan> = {
     tail: "barb", tailLen: 1.5, back: "ridges", wing: "tattered", wingSpan: 1.1, horns: "forward",
   },
 };
+
+// ── Evolution paths (chosen from stage 10) ───────────────────────────────────
+
+export const PATHS = {
+  armoured: { name: "Armoured", icon: "🛡️", blurb: "Bulkier, heavier armour plating, shorter wings." },
+  swift: { name: "Swift", icon: "🪶", blurb: "Leaner and longer, with wider wings built for speed." },
+} as const;
+export type EvolutionPath = keyof typeof PATHS;
+export const PATH_STAGE = 10;
+
+export function isPath(v: unknown): v is EvolutionPath {
+  return v === "armoured" || v === "swift";
+}
+
+/** The element's plan, reshaped by the chosen path (only from PATH_STAGE). */
+export function planFor(element: Element, stage: number, path: EvolutionPath | null | undefined): BodyPlan {
+  const base = PLANS[element];
+  if (!path || stage < PATH_STAGE) return base;
+  if (path === "armoured") {
+    return { ...base, bodyW: base.bodyW * 1.1, bodyH: base.bodyH * 1.1, legW: base.legW * 1.25, wingSpan: base.wingSpan * 0.85, back: base.back === "none" ? "plates" : base.back, armour: 1.5 };
+  }
+  return { ...base, bodyW: base.bodyW * 0.9, bodyH: base.bodyH * 0.9, wingSpan: base.wingSpan * 1.2, tailLen: base.tailLen * 1.2, lift: base.lift - 1 };
+}
