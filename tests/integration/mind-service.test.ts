@@ -1,3 +1,4 @@
+import { addDays } from "@/features/mind/rules";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getStreakBonusByCategory } from "@/features/honour/server/service";
 import {
@@ -49,14 +50,15 @@ describe("mind service", () => {
     let stats = await getCardStats(db, TODAY);
     expect(stats.due.length).toBe(STARTER_DECK.length + 1);
 
-    expect(await reviewCard(db, own.id, true, TODAY)).toEqual({ box: 2, dueOn: "2026-11-21" });
+    // FSRS: a new card marked Good comes back in ~4 days (shown as box 3).
+    expect(await reviewCard(db, own.id, true, TODAY)).toEqual({ box: 3, dueOn: addDays(TODAY, 4) });
     await expect(reviewCard(db, own.id, true, TODAY)).rejects.toThrow(/isn't due/);
     for (const c of stats.due.filter((c) => c.id !== own.id).slice(0, 9)) await reviewCard(db, c.id, false, TODAY);
 
     stats = await getCardStats(db, TODAY);
     expect(stats.reviewedToday).toBe(10);
     expect(stats.correctToday).toBe(1);
-    expect(stats.byBox[1]).toBe(1);
+    expect(stats.byBox[2]).toBe(1);
   });
 
   it("saves one reflection per day with mood validation", async () => {

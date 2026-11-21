@@ -99,3 +99,14 @@ export function nextDue(r: Pick<Recurring, "cadence" | "nextOn">, today: string)
   }
   return next;
 }
+
+/** Every expected payment date in [from, to], starting from the next due date. */
+export function occurrences(r: Pick<Recurring, "cadence" | "nextOn">, from: string, to: string): string[] {
+  const out: string[] = [];
+  let d = r.nextOn;
+  for (let i = 0; i < 120 && d <= to; i++) {
+    if (d >= from) out.push(d);
+    d = r.cadence === "monthly" ? addMonth(d) : fromMs(toMs(d) + (r.cadence === "weekly" ? 7 : 365) * DAY);
+  }
+  return out;
+}
