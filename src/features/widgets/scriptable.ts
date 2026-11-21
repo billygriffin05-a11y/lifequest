@@ -27,8 +27,12 @@ async function load() {
   return null;
 }
 
+// Local (phone) date, YYYY-MM-DD.
+const TODAY = new Date().toLocaleDateString("en-CA");
+const todays = (d) => d.events.filter((e) => e.day === TODAY);
+
 function when(e) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = TODAY;
   const label = e.day === today ? "Today" : new Date(e.day + "T12:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric" });
   return e.time ? label + " " + e.time : label;
 }
@@ -57,7 +61,7 @@ function build(d) {
     w.addAccessoryWidgetBackground = true;
     const s = w.addStack(); s.layoutVertically(); s.centerAlignContent();
     txt(s, mode === "calendar" ? "📅" : "⚔️", 12);
-    txt(s, mode === "calendar" ? d.events.filter((e) => e.day === new Date().toISOString().slice(0, 10)).length : d.quests.done + "/" + d.quests.total, 14, null, true);
+    txt(s, mode === "calendar" ? todays(d).length : d.quests.done + "/" + d.quests.total, 14, null, true);
     return w;
   }
   if (fam === "accessoryRectangular") {
@@ -66,9 +70,10 @@ function build(d) {
       for (const e of d.events.slice(0, 2)) txt(w, when(e) + " · " + e.title, 11);
       if (!d.events.length) txt(w, "Nothing coming up", 11);
     } else {
-      txt(w, d.rank.title + " · Lv " + d.rank.level, 12, null, true);
-      txt(w, "⚔️ " + d.quests.done + "/" + d.quests.total + "  🔥 " + d.bestStreak + "  🃏 " + d.cardsDue, 12);
-      txt(w, (d.boss.defeated ? "Boss defeated" : d.boss.emoji + " " + d.boss.hpLeft + " HP left"), 11);
+      const t = todays(d);
+      txt(w, d.rank.title + " · Lv " + d.rank.level + "  ⚔️ " + d.quests.done + "/" + d.quests.total + "  🔥 " + d.bestStreak, 12, null, true);
+      if (t.length) for (const e of t.slice(0, 2)) txt(w, (e.time ? e.time + " " : "📅 ") + e.title, 11);
+      else txt(w, "Nothing on today", 11);
     }
     return w;
   }
@@ -86,17 +91,27 @@ function build(d) {
     w.addSpacer(4);
     txt(w, d.boss.defeated ? "Boss defeated ✓" : d.boss.emoji + " " + d.boss.name + " · " + d.boss.hpLeft + "/" + d.boss.hp, 11, C.yellow);
   } else {
+    const t = todays(d);
     txt(w, d.rank.title + " · Lv " + d.rank.level, 15, C.text, true);
     txt(w, d.rank.xp + " XP · " + (d.honourToday >= 0 ? "+" : "") + d.honourToday + " today", 11, C.dim);
     w.addSpacer(4);
-    txt(w, "⚔️ Quests " + d.quests.done + "/" + d.quests.total + "   🔥 " + d.bestStreak, 12, C.aqua);
-    if (fam !== "small") txt(w, "🃏 " + d.cardsDue + " cards   💧 " + d.water.glasses + "/" + d.water.goal, 12, C.text);
+    txt(w, "⚔️ " + d.quests.done + "/" + d.quests.total + "  🔥 " + d.bestStreak + (fam === "small" ? "" : "  🃏 " + d.cardsDue + "  💧 " + d.water.glasses + "/" + d.water.goal), 12, C.aqua);
+    w.addSpacer(6);
+    // What's on today (from your Google calendar and detected bills).
+    txt(w, "Today", 11, C.pink, true);
+    const n = fam === "small" ? 2 : fam === "medium" ? 2 : 5;
+    if (!t.length) txt(w, "Nothing on today", 12, C.dim);
+    for (const e of t.slice(0, n)) txt(w, (e.time ? e.time + "  " : "") + e.title, 12, C.text);
+    if (t.length > n) txt(w, "+" + (t.length - n) + " more", 10, C.dim);
     if (fam === "large") {
       w.addSpacer(6);
       txt(w, d.boss.defeated ? "Boss defeated ✓" : d.boss.emoji + " " + d.boss.name + " · " + d.boss.hpLeft + " HP", 12, C.yellow);
-      w.addSpacer(6);
-      txt(w, "Coming up", 11, C.pink, true);
-      for (const e of d.events.slice(0, 4)) txt(w, when(e) + " · " + e.title, 12);
+      const later = d.events.filter((e) => e.day > TODAY);
+      if (later.length) {
+        w.addSpacer(6);
+        txt(w, "Coming up", 11, C.pink, true);
+        for (const e of later.slice(0, 3)) txt(w, when(e) + " · " + e.title, 12);
+      }
     }
   }
   w.addSpacer();

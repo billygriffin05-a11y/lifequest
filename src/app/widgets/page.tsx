@@ -58,7 +58,7 @@ async function Setup() {
         <p className="text-sm text-silver-300">Set the widget&apos;s <strong>Parameter</strong> to choose:</p>
         <ul className="mt-1 grid gap-1 text-sm text-silver-100">
           <li>
-            <strong>today</strong> (or blank): rank, quests, streak, cards and water; large adds the boss and what&apos;s coming up
+            <strong>today</strong> (or blank): your level, XP, quests and streak, plus what&apos;s on today; large adds the boss and the next few days
           </li>
           <li>
             <strong>calendar</strong>: your next events and bills from your Google calendar (e.g. Pay rent)
