@@ -138,6 +138,10 @@ export interface GoogleEventItem {
   id: string;
   status?: string;
   summary?: string;
+  eventType?: string;
+  recurrence?: string[];
+  extendedProperties?: { private?: Record<string, string> };
+  recurringEventId?: string;
   start?: GoogleEventTime;
   end?: GoogleEventTime;
 }
@@ -170,6 +174,21 @@ export async function listEvents(
     if (!pageToken) break;
   }
   return out;
+}
+
+/** Text search across one calendar (series not expanded), for the Settings "find an event" check. */
+export async function searchEvents(
+  fetchImpl: Fetch,
+  accessToken: string,
+  calendarId: string,
+  query: string,
+  timeMin: string,
+  timeMax: string,
+): Promise<GoogleEventItem[]> {
+  const q = new URLSearchParams({ q: query, timeMin, timeMax, singleEvents: "false", maxResults: "25", showDeleted: "false" });
+  const res = await calendarCall(fetchImpl, accessToken, "GET", `/calendars/${encodeURIComponent(calendarId)}/events?${q}`);
+  if (!res.ok) throw new GoogleApiError(`Could not search events (${res.status})`, res.status);
+  return ((await res.json()) as { items?: GoogleEventItem[] }).items ?? [];
 }
 
 export async function createLifequestCalendar(fetchImpl: Fetch, accessToken: string): Promise<string> {
