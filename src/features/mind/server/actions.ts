@@ -93,7 +93,9 @@ export async function addCardAction(formData: FormData) {
 
 export async function reviewCardAction(formData: FormData) {
   try {
-    await svc.reviewCard(prisma, str(formData, "id"), str(formData, "result") === "right", today());
+    const g = Number(str(formData, "grade"));
+    const answer = g >= 1 && g <= 4 ? (g as 1 | 2 | 3 | 4) : str(formData, "result") === "right";
+    await svc.reviewCard(prisma, str(formData, "id"), answer, today());
   } catch (err) {
     back("/mind/cards", errorText(err), false);
   }
@@ -103,4 +105,13 @@ export async function reviewCardAction(formData: FormData) {
 export async function archiveCardAction(formData: FormData) {
   await svc.archiveCard(prisma, str(formData, "id"));
   back("/mind/cards", "Card archived.", true, "#all-cards");
+}
+
+export async function saveExamAction(answers: { cardId: string; correct: boolean }[], durationSec: number): Promise<{ ok: boolean; id?: string }> {
+  try {
+    const row = await svc.saveExam(prisma, answers, durationSec, today());
+    return { ok: true, id: row.id };
+  } catch {
+    return { ok: false };
+  }
 }

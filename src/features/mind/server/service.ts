@@ -2,9 +2,11 @@
  * Mind service: books, flashcards, reflections (mood + journal), focus sessions.
  * Journal text and mood are private: never logged or sent anywhere.
  */
+import { schedule, type Grade } from "../fsrs";
+import { byTopic, EXAM_QUESTIONS, EXAM_SECONDS, shuffle, type TopicResult } from "../exam";
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { addDays, averageMood, FOCUS_LENGTHS, MAX_FOCUS_MINUTES_PER_DAY, mindXp, nextReview, readingPercent } from "../rules";
+import { addDays, averageMood, FOCUS_LENGTHS, MAX_FOCUS_MINUTES_PER_DAY, mindXp, readingPercent } from "../rules";
 import { STARTER_DECK } from "../starter-deck";
 
 type Db = PrismaClient;
@@ -99,15 +101,22 @@ export async function archiveCard(db: Db, id: string) {
   await db.flashcard.update({ where: { id }, data: { archivedAt: new Date() } });
 }
 
-export async function reviewCard(db: Db, id: string, correct: boolean, today: string) {
+/**
+ * Review a due card. `answer` is an FSRS grade (1 Again … 4 Easy); `true`/`false`
+ * are accepted for older callers and mean Good / Again.
+ */
+export async function reviewCard(db: Db, id: string, answer: boolean | Grade, today: string) {
   day.parse(today);
+  const grade: Grade = answer === true ? 3 : answer === false ? 1 : answer;
+  if (![1, 2, 3, 4].includes(grade)) throw new MindError("Unknown answer.");
   const card = await db.flashcard.findUnique({ where: { id } });
   if (!card || card.archivedAt) throw new MindError("Unknown card.");
   if (card.dueOn > today) throw new MindError("That card isn't due yet.");
-  const next = nextReview(card.box, correct, today);
+  const s = schedule(card, grade, today);
+  const next = { box: s.box, dueOn: s.dueOn };
   await db.$transaction([
-    db.flashcard.update({ where: { id }, data: next }),
-    db.cardReview.create({ data: { cardId: id, day: today, correct } }),
+    db.flashcard.update({ where: { id }, data: { ...next, stability: s.stability, difficulty: s.difficulty, lastReviewOn: s.lastReviewOn } }),
+    db.cardReview.create({ data: { cardId: id, day: today, correct: grade >= 2, grade } }),
   ]);
   return next;
 }
@@ -195,4 +204,43 @@ export async function getMindRewards(db: Db): Promise<Map<string, number>> {
     focus,
     journalDays: journal.map((j) => j.day),
   });
+}
+
+// ── Mock exam ────────────────────────────────────────────────────────────────
+
+const examAnswers = z
+  .array(z.object({ cardId: z.string().min(1).max(64), correct: z.boolean() }).strict())
+  .min(1)
+  .max(EXAM_QUESTIONS);
+
+/** A paper: up to 90 active cards, shuffled per sitting. */
+export async function examPaper(db: Db, seed: number) {
+  const cards = await db.flashcard.findMany({ where: { archivedAt: null }, select: { id: true, topic: true, front: true, back: true } });
+  return shuffle(cards, seed).slice(0, EXAM_QUESTIONS);
+}
+
+/** Store a finished attempt. Topics come from the database, not the client. */
+export async function saveExam(db: Db, rawAnswers: unknown, durationSec: number, today: string) {
+  day.parse(today);
+  const answers = examAnswers.parse(rawAnswers);
+  const ids = [...new Set(answers.map((a) => a.cardId))];
+  const cards = await db.flashcard.findMany({ where: { id: { in: ids } }, select: { id: true, topic: true } });
+  const topicOf = new Map(cards.map((c) => [c.id, c.topic]));
+  const known = answers.filter((a) => topicOf.has(a.cardId));
+  if (!known.length) throw new MindError("No answers to save.");
+  const results = byTopic(known.map((a) => ({ topic: topicOf.get(a.cardId)!, correct: a.correct })));
+  return db.mockExam.create({
+    data: {
+      takenOn: today,
+      durationSec: Math.min(EXAM_SECONDS * 2, Math.max(0, Math.round(durationSec))),
+      total: known.length,
+      correct: known.filter((a) => a.correct).length,
+      byTopic: JSON.stringify(results),
+    },
+  });
+}
+
+export async function listExams(db: Db, take = 10) {
+  const rows = await db.mockExam.findMany({ orderBy: { createdAt: "desc" }, take });
+  return rows.map((r) => ({ ...r, byTopic: JSON.parse(r.byTopic) as TopicResult[] }));
 }

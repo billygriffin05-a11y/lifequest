@@ -4,7 +4,7 @@
  */
 import { z } from "zod";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { bodyXp, liftPbs, MAX_GLASSES, runPbs, SLEEP_GOAL_MINUTES, sleepMinutes, WATER_GOAL } from "../rules";
+import { bodyXp, liftPbs, liftSuggestions, MAX_GLASSES, runPbs, SLEEP_GOAL_MINUTES, sleepMinutes, WATER_GOAL } from "../rules";
 
 type Db = PrismaClient;
 export class BodyError extends Error {}
@@ -108,6 +108,7 @@ export async function getBodyOverview(db: Db, today: string) {
     today,
     recentSets: sets.slice(0, 20),
     pbs: liftPbs(sets),
+    suggestions: liftSuggestions(sets).slice(0, 8),
     recentRuns: runs.slice(0, 10),
     runPbs: runPbs(runs),
     runTotalMetres: runs.reduce((n, r) => n + r.distanceMetres, 0),
