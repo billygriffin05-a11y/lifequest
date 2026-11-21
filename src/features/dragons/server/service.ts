@@ -4,6 +4,7 @@ import { londonDateKey } from "@/features/honour/rules";
 import { getCategoryTotals, getStreakBonusByCategory, listLedger, type LedgerItem } from "@/features/honour/server/service";
 import { AREAS, areaForCategory, type Area } from "../areas";
 import { growthForXp, moodFor, type Growth, type Mood } from "../rules";
+import { isPath, PATH_STAGE, type EvolutionPath } from "../body-plans";
 import { MAX_DRAGON_NAME, stageTimeline, type StageReached } from "../timeline";
 
 export const MOOD_WINDOW_DAYS = 7;
@@ -15,6 +16,8 @@ export interface DragonView {
   customName: string | null;
   /** Equipped shop cosmetic, if any. */
   accessory: string | null;
+  /** Evolution path chosen from stage 10, if any. */
+  path: EvolutionPath | null;
   growth: Growth;
   mood: Mood;
   recentHonour: number;
@@ -55,7 +58,9 @@ export async function getDragons(db: PrismaClient, now = new Date()): Promise<Dr
     const acc = byArea.get(area.id) ?? { xp: 0, recentHonour: 0, recentEntries: 0 };
     const customName = names.get(area.id)?.customName ?? null;
     const accessory = names.get(area.id)?.accessory ?? null;
+    const rawPath = names.get(area.id)?.path;
     return {
+      path: isPath(rawPath) ? rawPath : null,
       area,
       displayName: customName ?? area.dragonName,
       customName,
@@ -86,6 +91,18 @@ export async function renameDragon(db: PrismaClient, input: { areaId: string; na
   await db.dragonProfile.upsert({ where: { areaId }, create: { areaId, customName: name }, update: { customName: name } });
   await db.auditEvent.create({ data: { actor: "owner", action: "dragon.rename", entityType: "DragonProfile", entityId: areaId } });
   return name;
+}
+
+// ── Evolution path ───────────────────────────────────────────────────────────
+
+/** Choose (or change) a dragon's path. Only allowed once it reaches PATH_STAGE. */
+export async function setDragonPath(db: PrismaClient, areaId: string, path: string, now = new Date()) {
+  const { areaId: id } = renameSchema.pick({ areaId: true }).parse({ areaId });
+  if (!isPath(path)) throw new Error("Unknown path");
+  const dragon = (await getDragons(db, now)).find((d) => d.area.id === id)!;
+  if (dragon.growth.stage < PATH_STAGE) throw new Error("Not old enough to choose a path yet");
+  await db.dragonProfile.upsert({ where: { areaId: id }, create: { areaId: id, path }, update: { path } });
+  await db.auditEvent.create({ data: { actor: "owner", action: "dragon.path", entityType: "DragonProfile", entityId: id } });
 }
 
 // ── Detail page ──────────────────────────────────────────────────────────────

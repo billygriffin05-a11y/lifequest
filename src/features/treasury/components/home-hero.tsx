@@ -28,6 +28,7 @@ export async function HomeHero() {
           element={dragon.area.element}
           palette={dragon.area.palette}
           accessory={dragon.accessory}
+          path={dragon.path}
           label={`${dragon.displayName}: ${dragon.growth.stageName}, ${MOOD_TEXT[dragon.mood].toLowerCase()}`}
           className="aspect-[7/5] w-full"
         />

@@ -14,7 +14,7 @@ export async function NotificationsCard({ saved }: { saved: boolean }) {
   const [prefs, devices] = await Promise.all([getPrefs(prisma), countSubscriptions(prisma)]);
   const { publicKey } = getOrCreateVapidKeys(getDataPaths());
 
-  const check = (name: "streak" | "cards" | "budget" | "plans", label: string, hint: string, time?: { name: string; value: string }) => (
+  const check = (name: "streak" | "cards" | "budget" | "plans" | "review", label: string, hint: string, time?: { name: string; value: string }) => (
     <li className="flex flex-wrap items-center gap-3 py-2">
       <label className="flex min-h-11 flex-1 items-center gap-3">
         <input type="checkbox" name={name} defaultChecked={prefs[name]} className="h-5 w-5 accent-emerald-400" />
@@ -50,6 +50,7 @@ export async function NotificationsCard({ saved }: { saved: boolean }) {
           {check("cards", "Cards due", "Security+ cards ready to review.", { name: "cardsTime", value: prefs.cardsTime })}
           {check("plans", "If-then plans", "At the time you set on each action's plan.")}
           {check("budget", "Budgets", "When a budget passes 80% (once per month).")}
+          {check("review", "Weekly review", "Sunday at 18:00, if you haven't done it yet.")}
         </ul>
         <div className="mt-3 flex items-center gap-3">
           <button type="submit" className="min-h-11 rounded-lg bg-gold-500 px-4 text-sm font-semibold text-obsidian-950 hover:bg-gold-400">

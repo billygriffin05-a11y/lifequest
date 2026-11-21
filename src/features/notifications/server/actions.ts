@@ -46,6 +46,7 @@ export async function savePushPrefsAction(formData: FormData) {
     cardsTime: time("cardsTime", DEFAULT_PREFS.cardsTime),
     budget: formData.get("budget") === "on",
     plans: formData.get("plans") === "on",
+    review: formData.get("review") === "on",
   };
   await setPrefs(prisma, prefs);
   redirect("/settings?push=saved#notifications");

@@ -15,6 +15,8 @@ export const prefsSchema = z
     cardsTime: TIME,
     budget: z.boolean(),
     plans: z.boolean(),
+    /** Sunday evening nudge to do the weekly review. */
+    review: z.boolean().default(true),
   })
   .strict();
 export type PushPrefs = z.infer<typeof prefsSchema>;
@@ -26,7 +28,10 @@ export const DEFAULT_PREFS: PushPrefs = {
   cardsTime: "09:00",
   budget: true,
   plans: true,
+  review: true,
 };
+
+export const REVIEW_TIME = "18:00";
 
 /** A reminder that's late by more than this is skipped (PC was off) rather than sent hours later. */
 export const LATE_WINDOW_MIN = 180;
@@ -42,6 +47,10 @@ export interface ReminderFacts {
   budgetsNearLimit: string[];
   /** If-then plans with a time, not done today. */
   plans: { actionId: string; name: string; icon: string; cue: string; time: string }[];
+  /** Monday of this week, whether today is Sunday, and whether this week's review is done. */
+  weekStart?: string;
+  isSunday?: boolean;
+  reviewDone?: boolean;
 }
 
 export interface Reminder {
@@ -82,6 +91,9 @@ export function dueReminders(prefs: PushPrefs, f: ReminderFacts): Reminder[] {
       body: f.streaksAtRisk === 1 ? "One streak ends at midnight unless you log it." : `${f.streaksAtRisk} streaks end at midnight unless you log them.`,
       url: "/honour",
     });
+  }
+  if (prefs.review && f.isSunday && !f.reviewDone && f.weekStart && inWindow(f.nowTime, REVIEW_TIME)) {
+    out.push({ key: `review:${f.weekStart}`, title: "📜 Weekly review", body: "Three quick questions to close out your week.", url: "/report#review" });
   }
   if (prefs.budget) {
     // Once per category per month; no amounts in the message.

@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { weekStart } from "@/features/honour/progress";
 import { londonDateKey } from "@/features/honour/rules";
 import { getPlayerProgress, listActions } from "@/features/honour/server/service";
+import { WeeklyReview } from "@/features/report/components/weekly-review";
 import { getWeeklyReport } from "@/features/report/server/service";
 import { prisma } from "@/server/db/client";
 
@@ -194,6 +195,8 @@ async function Report({ searchParams }: { searchParams: Promise<Record<string, s
           <Stat label="Journal days" value={`${r.mind.journalDays} / 7`} />
         </dl>
       </section>
+
+      <WeeklyReview week={week} status={typeof sp.review === "string" ? sp.review : null} />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import { getMonthOverview } from "@/features/finance/server/service";
 import { londonDateKey } from "@/features/honour/rules";
 import { getLoggedTodayActionIds, getPlayerProgress, listActions } from "@/features/honour/server/service";
 import { getCardStats } from "@/features/mind/server/service";
+import { weekStart } from "@/features/honour/progress";
+import { getReview, isComplete } from "@/features/report/server/review";
 import { dueReminders, type ReminderFacts } from "../rules";
 import { claim, countSubscriptions, getOrCreateVapidKeys, getPrefs, sendToAll, type Sender } from "./service";
 
@@ -24,7 +26,12 @@ export async function collectFacts(db: PrismaClient, now: Date): Promise<Reminde
     getMonthOverview(db, month),
   ]);
   const good = actions.filter((a) => a.kind === "good");
+  const monday = weekStart(today);
+  const review = await getReview(db, monday);
   return {
+    weekStart: monday,
+    isSunday: new Date(`${today}T12:00:00Z`).getUTCDay() === 0,
+    reviewDone: isComplete(review),
     today,
     month,
     nowTime: londonTime.format(now),
