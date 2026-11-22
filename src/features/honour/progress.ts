@@ -58,6 +58,71 @@ export function runLengths(days: ReadonlySet<string>): number[] {
   return runs;
 }
 
+// ── Forgiving streaks: shields ───────────────────────────────────────────────
+
+/** A shield is earned for every 7 days in a row; at most this many are banked. */
+export const SHIELD_EVERY = 7;
+export const MAX_SHIELDS = 2;
+
+export interface StreakTimeline {
+  /** Current streak in done days (shield-covered days don't count as done). */
+  current: number;
+  /** Longest streak ever, in done days. */
+  best: number;
+  /** Shields banked right now. */
+  shields: number;
+  /** Done-day count of every streak (for bonus XP). */
+  runs: number[];
+  /** Days a shield covered. */
+  covered: string[];
+}
+
+/**
+ * Walk day by day from the first done day to today. A single missed day is
+ * covered by a banked shield (the streak survives); a second miss in a row,
+ * or a miss with no shield, ends the streak and its shields. Today not being
+ * done yet never breaks anything (you have until midnight).
+ */
+export function streakTimeline(days: ReadonlySet<string>, todayKey: string): StreakTimeline {
+  const sorted = [...days].filter((d) => d <= todayKey).sort();
+  if (!sorted.length) return { current: 0, best: 0, shields: 0, runs: [], covered: [] };
+  const runs: number[] = [];
+  const covered: string[] = [];
+  let run = 0;
+  let sinceShield = 0;
+  let shields = 0;
+  let missed = 0;
+  const end = toUtc(todayKey);
+  for (let ms = toUtc(sorted[0]); ms <= end; ms += DAY) {
+    const key = fromUtc(ms);
+    if (days.has(key)) {
+      run++;
+      sinceShield++;
+      missed = 0;
+      if (sinceShield === SHIELD_EVERY) {
+        shields = Math.min(MAX_SHIELDS, shields + 1);
+        sinceShield = 0;
+      }
+      continue;
+    }
+    if (key === todayKey) break;
+    missed++;
+    if (missed === 1 && shields > 0 && run > 0) {
+      shields--;
+      covered.push(key);
+      continue;
+    }
+    if (run > 0) runs.push(run);
+    run = 0;
+    sinceShield = 0;
+    shields = 0;
+  }
+  if (run > 0) runs.push(run);
+  // The last run is "current" only if it reaches yesterday/today (possibly via a shield).
+  const alive = run > 0;
+  return { current: alive ? run : 0, best: Math.max(0, ...runs), shields: alive ? shields : 0, runs, covered };
+}
+
 export const STREAK_BONUS = { every7: 25, every30: 100 } as const;
 
 /** Bonus XP for one run: +25 for every full 7 days, +100 more for every full 30. */
@@ -104,6 +169,8 @@ export interface StreakInfo {
   /** Days done this week (Mon–Sun). */
   thisWeek: number;
   weeksMet: number;
+  /** Streak shields banked. */
+  shields: number;
 }
 
 export function streaksByAction(
@@ -114,12 +181,13 @@ export function streaksByAction(
   const out = new Map<string, StreakInfo>();
   const thisMonday = weekStart(todayKey);
   for (const [actionId, { days, category }] of goodDaysByAction(rows)) {
-    const runs = runLengths(days);
+    const tl = streakTimeline(days, todayKey);
     const weekly = weeklyBonus(days, targets.get(actionId) ?? null);
     out.set(actionId, {
-      current: currentStreak(days, todayKey),
-      best: Math.max(0, ...runs),
-      bonusXp: runs.reduce((n, len) => n + bonusForRun(len), 0) + weekly.bonusXp,
+      current: tl.current,
+      best: tl.best,
+      shields: tl.shields,
+      bonusXp: tl.runs.reduce((n, len) => n + bonusForRun(len), 0) + weekly.bonusXp,
       category,
       thisWeek: daysPerWeek(days).get(thisMonday) ?? 0,
       weeksMet: weekly.weeksMet,
@@ -243,6 +311,8 @@ export interface BossBattle {
   hp: number;
   /** Good-deed Honour dealt this week. */
   damage: number;
+  /** Extra damage from training, wellbeing and study this week. */
+  activity: ActivityDamage;
   /** Bad-habit Honour healed this week. */
   healed: number;
   hpLeft: number;
@@ -253,20 +323,66 @@ export function bossForWeek(weekKey: string) {
   return BOSSES[hash(`boss:${weekKey}`) % BOSSES.length];
 }
 
-/** Good deeds hit the boss; bad habits heal it. Defeated when net damage ≥ HP. */
-export function bossBattle(weekKey: string, goodHonour: number, badHonour: number): BossBattle {
+/** Good deeds and training hit the boss; bad habits heal it. Defeated when net damage ≥ HP. */
+export function bossBattle(weekKey: string, goodHonour: number, badHonour: number, activity: ActivityDamage = NO_ACTIVITY): BossBattle {
   const boss = bossForWeek(weekKey);
-  const net = Math.max(0, goodHonour - badHonour);
+  const net = Math.max(0, goodHonour + activity.total - badHonour);
   return {
     weekStart: weekKey,
     name: boss.name,
     emoji: boss.emoji,
     hp: BOSS_HP,
     damage: goodHonour,
+    activity,
     healed: badHonour,
     hpLeft: Math.max(0, BOSS_HP - net),
     defeated: net >= BOSS_HP,
   };
+}
+
+// ── Training damage (body + mind activity) ───────────────────────────────────
+
+export const ACTIVITY_DAMAGE = { workoutDay: 15, run: 15, waterDay: 5, sleepNight: 5, focus25: 5, reviews10: 5 } as const;
+
+export interface ActivityFacts {
+  workoutDays: Iterable<string>;
+  runs: Iterable<string>;
+  waterDays: Iterable<string>;
+  sleepNights: Iterable<string>;
+  focus: Iterable<{ day: string; minutes: number }>;
+  reviewDays: Iterable<string>;
+}
+
+export interface ActivityDamage {
+  total: number;
+  training: number; // workouts + runs
+  wellbeing: number; // water + sleep
+  study: number; // focus + card reviews
+}
+
+export const NO_ACTIVITY: ActivityDamage = { total: 0, training: 0, wellbeing: 0, study: 0 };
+
+/** Boss damage per week (keyed by Monday) from body and mind activity. */
+export function activityDamageByWeek(f: ActivityFacts): Map<string, ActivityDamage> {
+  const out = new Map<string, ActivityDamage>();
+  const add = (day: string, part: "training" | "wellbeing" | "study", n: number) => {
+    const w = weekStart(day);
+    const cur = out.get(w) ?? { ...NO_ACTIVITY };
+    cur[part] += n;
+    cur.total += n;
+    out.set(w, cur);
+  };
+  for (const d of new Set(f.workoutDays)) add(d, "training", ACTIVITY_DAMAGE.workoutDay);
+  for (const d of f.runs) add(d, "training", ACTIVITY_DAMAGE.run);
+  for (const d of new Set(f.waterDays)) add(d, "wellbeing", ACTIVITY_DAMAGE.waterDay);
+  for (const d of new Set(f.sleepNights)) add(d, "wellbeing", ACTIVITY_DAMAGE.sleepNight);
+  const focusByDay = new Map<string, number>();
+  for (const x of f.focus) focusByDay.set(x.day, (focusByDay.get(x.day) ?? 0) + x.minutes);
+  for (const [d, m] of focusByDay) if (m >= 25) add(d, "study", Math.floor(m / 25) * ACTIVITY_DAMAGE.focus25);
+  const reviewsByDay = new Map<string, number>();
+  for (const d of f.reviewDays) reviewsByDay.set(d, (reviewsByDay.get(d) ?? 0) + 1);
+  for (const [d, n] of reviewsByDay) if (n >= 10) add(d, "study", Math.floor(n / 10) * ACTIVITY_DAMAGE.reviews10);
+  return out;
 }
 
 /** Per-week good/bad Honour (undo-netted) from ledger rows. */

@@ -11,6 +11,7 @@ import {
   formatKm,
   formatPace,
   paceSecondsPerKm,
+  REP_RANGE,
   SLEEP_GOAL_MINUTES,
   SLEEP_NIGHT_XP,
   WATER_DAY_XP,
@@ -208,6 +209,27 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
           </button>
         </form>
 
+        {o.suggestions.length > 0 && (
+          <div className="mt-5 rounded-xl border border-emerald-500/30 p-3" data-testid="lift-suggestions">
+            <h3 className="font-display text-lg text-gold-300">Next session</h3>
+            <p className="text-xs text-silver-300">
+              Add a rep each time up to {REP_RANGE.high}; when you hit {REP_RANGE.high}, add 2.5 kg and drop back to {REP_RANGE.low}.
+            </p>
+            <ul className="mt-2 grid gap-1 text-sm">
+              {o.suggestions.map((s) => (
+                <li key={s.exercise} className="flex flex-wrap justify-between gap-x-3">
+                  <span className="text-silver-100">{s.exercise}</span>
+                  <span className="text-emerald-300">
+                    {s.next.sets}×{s.next.reps}
+                    {s.next.weightGrams ? ` @ ${formatKg(s.next.weightGrams)}` : " (bodyweight)"}
+                    {s.reason === "add-weight" ? " ⬆ weight" : " ⬆ 1 rep"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-5 grid gap-6 lg:grid-cols-2">
           <div>
             <h3 className="font-display text-lg text-gold-300">Personal bests</h3>
@@ -339,7 +361,7 @@ async function Body({ searchParams }: { searchParams: Promise<Record<string, str
 
 export default function BodyPage({ searchParams }: PageProps<"/body">) {
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="-mx-4 flex gap-x-5 overflow-x-auto whitespace-nowrap px-4 text-sm [scrollbar-width:none]">
         <Link href="/" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← LIFEQUEST

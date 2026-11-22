@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { Element, Palette } from "../areas";
 import type { Mood } from "../rules";
 import { COLOURS, itemById, type ShopItem } from "@/features/treasury/catalog";
+import type { EvolutionPath } from "../body-plans";
 import { GRID_H, GRID_W, spriteLayers, type Run } from "../sprite";
 
 interface Props {
@@ -15,6 +16,8 @@ interface Props {
   animate?: boolean;
   /** Equipped cosmetic item id (treasure shop). */
   accessory?: string | null;
+  /** Evolution path (from stage 10). */
+  path?: EvolutionPath | null;
 }
 
 function Runs({ runs, palette }: { runs: Run[]; palette: Palette }) {
@@ -41,14 +44,26 @@ function Accessory({ item, head }: { item: ShopItem; head: [number, number] }) {
 const origin = ([x, y]: [number, number]): CSSProperties => ({ transformOrigin: `${x}px ${y}px` });
 
 /** Crisp pixel-art elemental dragon rendered as layered SVG. */
-export function DragonSprite({ stage, mood, element, palette, label, className, animate = true, accessory }: Props) {
+export function DragonSprite({ stage, mood, element, palette, label, className, animate = true, accessory, path }: Props) {
   const item = itemById(accessory);
-  const l = spriteLayers(stage, mood, element);
+  const l = spriteLayers(stage, mood, element, path ?? null);
   const calm = mood === "grumpy" || mood === "restless";
   return (
     <svg viewBox={`0 0 ${GRID_W} ${GRID_H}`} shapeRendering="crispEdges" role="img" aria-label={label} className={className}>
+      {l.shadow.length > 0 && (
+        <g className={animate ? "lq-shadow" : undefined} data-testid="dragon-shadow">
+          <Runs runs={l.shadow} palette={palette} />
+        </g>
+      )}
+      {/* Flying dragons bob in the air; mood motion plays on top. */}
+      <g className={animate && l.flying ? "lq-hover" : undefined} data-flying={l.flying || undefined}>
+      {/* Whole-body mood motion: joyful bounces, content sways, restless paces, grumpy huffs. */}
+      <g className={animate ? `lq-mood lq-mood-${mood}` : undefined} data-mood={mood}>
       {l.wing.length > 0 && l.wingOrigin && (
-        <g className={animate && !calm ? (mood === "joyful" ? "lq-flap lq-fast" : "lq-flap") : undefined} style={origin(l.wingOrigin)}>
+        <g
+          className={animate && (!calm || l.flying) ? (mood === "joyful" ? "lq-flap lq-fast" : l.flying ? "lq-flap lq-soar" : "lq-flap") : undefined}
+          style={origin(l.wingOrigin)}
+        >
           <Runs runs={l.wing} palette={palette} />
         </g>
       )}
@@ -71,6 +86,8 @@ export function DragonSprite({ stage, mood, element, palette, label, className, 
           <Runs runs={m.runs} palette={palette} />
         </g>
       ))}
+      </g>
+      </g>
     </svg>
   );
 }

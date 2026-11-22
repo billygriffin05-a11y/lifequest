@@ -58,11 +58,19 @@ describe("google config", () => {
     });
   });
 
-  it("asks only for the app-created-calendars scope, offline, with PKCE + state", () => {
+  it("asks only for app-calendar write + read-only scopes, offline, with PKCE + state", () => {
     const cfg = googleConfig({ GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "s" })!;
     const url = new URL(buildAuthUrl(cfg, "state123", "verifier456"));
     expect(url.origin + url.pathname).toBe("https://accounts.google.com/o/oauth2/v2/auth");
-    expect(url.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/calendar.app.created");
+    const scopes = url.searchParams.get("scope")!.split(" ");
+    expect(scopes).toEqual([
+      "https://www.googleapis.com/auth/calendar.app.created",
+      "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+      "https://www.googleapis.com/auth/calendar.events.readonly",
+    ]);
+    // Never full calendar access or write access to the owner's own events.
+    expect(scopes).not.toContain("https://www.googleapis.com/auth/calendar");
+    expect(scopes).not.toContain("https://www.googleapis.com/auth/calendar.events");
     expect(url.searchParams.get("access_type")).toBe("offline");
     expect(url.searchParams.get("state")).toBe("state123");
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");

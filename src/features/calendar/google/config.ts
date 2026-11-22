@@ -30,10 +30,17 @@ export function googleConfig(env: Record<string, string | undefined> = process.e
 }
 
 /**
- * Least privilege: `calendar.app.created` only lets LIFEQUEST manage calendars
- * it creates itself (its own "LIFEQUEST" calendar) — it cannot read or change
- * the owner's other calendars or events.
+ * Least privilege:
+ * - `calendar.app.created`: write only to the calendar LIFEQUEST creates itself.
+ * - `calendar.calendarlist.readonly` + `calendar.events.readonly`: READ the
+ *   owner's other calendars so the in-app calendar can show them (e.g. "Pay
+ *   rent"). LIFEQUEST never creates, changes or deletes those events, and never
+ *   stores them — they are fetched live and held in memory for a short time.
  */
-export const GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar.app.created"] as const;
+export const GOOGLE_SCOPES = [
+  "https://www.googleapis.com/auth/calendar.app.created",
+  "https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+  "https://www.googleapis.com/auth/calendar.events.readonly",
+] as const;
 
 export const CALENDAR_NAME = "LIFEQUEST";

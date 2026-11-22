@@ -1,10 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Cinzel, Inter } from "next/font/google";
+import { Inter, Pixelify_Sans } from "next/font/google";
 import { ServiceWorker } from "@/components/service-worker";
+import { SiteMenu } from "@/components/site-menu";
+import { NeonCity } from "@/components/ui/neon-city";
 import "./globals.css";
 
 // Fonts are downloaded at build time and self-hosted — no runtime requests to Google.
-const cinzel = Cinzel({ variable: "--font-cinzel", subsets: ["latin"], weight: ["500", "700"] });
+const pixel = Pixelify_Sans({ variable: "--font-pixel", subsets: ["latin"], weight: ["500", "700"] });
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -15,7 +17,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#07080a",
+  themeColor: "#0c0618",
+  colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -23,8 +26,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-GB" className={`${cinzel.variable} ${inter.variable} h-full antialiased`}>
+    <html lang="en-GB" className={`${pixel.variable} ${inter.variable} h-full bg-obsidian-950 antialiased`}>
       <body className="min-h-full flex flex-col">
+        <NeonCity />
+        <SiteMenu />
         {children}
         <ServiceWorker />
       </body>

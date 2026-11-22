@@ -12,7 +12,7 @@ const MOODS: Mood[] = ["joyful", "content", "restless", "grumpy"];
 export default function DragonGalleryPage() {
   const fire = AREAS[0];
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/dragons" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← Dragon Lair
@@ -20,7 +20,7 @@ export default function DragonGalleryPage() {
       </nav>
       <h1 className="font-display text-4xl font-bold tracking-wide text-gold-300">Dragon Art Gallery</h1>
       <p className="mt-2 max-w-2xl text-silver-300">
-        Eight elemental dragons across all {STAGES.length} stages — wings, breath, spines and crowns unlock as they grow.
+        Eight elemental dragons across all {STAGES.length} stages — wings, breath, spines and regal armour unlock as they grow, and the oldest take flight.
       </p>
 
       {AREAS.map((area) => (
@@ -41,7 +41,6 @@ export default function DragonGalleryPage() {
                   palette={area.palette}
                   label={`${area.dragonName} stage ${i + 1}: ${stage.name}`}
                   className="aspect-[7/5] w-full"
-                  animate={false}
                 />
                 <span className="block truncate text-[0.65rem] text-silver-300">
                   {i + 1}. {stage.name}

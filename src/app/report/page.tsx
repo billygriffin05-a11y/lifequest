@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { weekStart } from "@/features/honour/progress";
 import { londonDateKey } from "@/features/honour/rules";
 import { getPlayerProgress, listActions } from "@/features/honour/server/service";
+import { WeeklyReview } from "@/features/report/components/weekly-review";
 import { getWeeklyReport } from "@/features/report/server/service";
 import { prisma } from "@/server/db/client";
 
@@ -194,13 +195,15 @@ async function Report({ searchParams }: { searchParams: Promise<Record<string, s
           <Stat label="Journal days" value={`${r.mind.journalDays} / 7`} />
         </dl>
       </section>
+
+      <WeeklyReview week={week} status={typeof sp.review === "string" ? sp.review : null} />
     </div>
   );
 }
 
 export default function ReportPage({ searchParams }: PageProps<"/report">) {
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← LIFEQUEST

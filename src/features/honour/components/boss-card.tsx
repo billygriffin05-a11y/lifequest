@@ -38,6 +38,13 @@ export function BossCard({ boss, wins }: { boss: BossBattle; wins: number }) {
           ? `Defeated! +${BOSS_XP_REWARD} XP and +${BOSS_GOLD_REWARD} gold. A new boss arrives on Monday.`
           : `${num.format(boss.hpLeft)} / ${num.format(boss.hp)} HP left · you dealt ${num.format(boss.damage)}, bad habits healed ${num.format(boss.healed)}.`}
       </p>
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-silver-300" aria-label="Damage this week" data-testid="boss-damage">
+        <li>⚔️ Deeds {num.format(boss.damage)}</li>
+        <li>💪 Training {num.format(boss.activity.training)}</li>
+        <li>🧠 Study {num.format(boss.activity.study)}</li>
+        <li>💧 Wellbeing {num.format(boss.activity.wellbeing)}</li>
+        <li className="text-ember-300">🩸 Healed {num.format(boss.healed)}</li>
+      </ul>
     </section>
   );
 }

@@ -9,11 +9,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // The owner's real app builds into .next-prod (npm run app:build), so dev and
+  // test builds in .next can never replace the files it is serving.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
   // Native SQLite driver must not be bundled.
-  serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3"],
+  serverExternalPackages: ["better-sqlite3", "@prisma/adapter-better-sqlite3", "web-push"],
   turbopack: {
     rules: {
       "*.css": {

@@ -3,6 +3,7 @@
  * money, body and mind. Everything is derived from the local database.
  */
 import type { PrismaClient } from "@/generated/prisma/client";
+import { getActivityDamageByWeek } from "@/features/honour/server/activity";
 import { listLedger } from "@/features/honour/server/service";
 import { summariseWeek, weekDays } from "../rules";
 
@@ -16,8 +17,9 @@ export async function getWeeklyReport(db: Db, weekStart: string) {
   const to = days[6];
   const inWeek = { gte: from, lte: to };
 
-  const [ledger, spend, sets, runs, water, sleeps, focus, reviews, pages, reflections] = await Promise.all([
+  const [ledger, activity, spend, sets, runs, water, sleeps, focus, reviews, pages, reflections] = await Promise.all([
     listLedger(db),
+    getActivityDamageByWeek(db),
     db.transaction.aggregate({ where: { deletedAt: null, occurredOn: inWeek, amountPence: { gt: 0 } }, _sum: { amountPence: true } }),
     db.workoutSet.findMany({ where: { deletedAt: null, occurredOn: inWeek }, select: { occurredOn: true } }),
     db.runLog.findMany({ where: { deletedAt: null, occurredOn: inWeek }, select: { distanceMetres: true } }),
@@ -33,7 +35,7 @@ export async function getWeeklyReport(db: Db, weekStart: string) {
   return {
     weekStart: from,
     weekEnd: to,
-    honour: summariseWeek(ledger, from),
+    honour: summariseWeek(ledger, from, activity.get(from)),
     money: { spentPence: spend._sum.amountPence ?? 0 },
     body: {
       workoutDays: new Set(sets.map((s) => s.occurredOn)).size,

@@ -146,3 +146,41 @@ export function bodyXp(facts: { activeDays: Iterable<string>; waterDays: Iterabl
   add("Sleep", new Set(facts.sleepNights).size * SLEEP_NIGHT_XP);
   return out;
 }
+
+// ── Next-session suggestions (double progression) ───────────────────────────
+
+/** Rep range for double progression: add reps up to the top, then add weight and drop to the bottom. */
+export const REP_RANGE = { low: 6, high: 10 } as const;
+export const WEIGHT_STEP_GRAMS = 2500;
+
+export interface LiftSuggestion {
+  exercise: string;
+  last: { weightGrams: number; reps: number; sets: number; occurredOn: string };
+  next: { weightGrams: number; reps: number; sets: number };
+  reason: "add-weight" | "add-rep" | "bodyweight";
+}
+
+/**
+ * For each exercise's most recent session: if you reached the top of the rep
+ * range, add 2.5 kg and go back to the bottom; otherwise aim for one more rep
+ * at the same weight. Bodyweight work (0 kg) just adds a rep.
+ */
+export function liftSuggestions(sets: readonly (SetFact & { sets: number })[]): LiftSuggestion[] {
+  const latest = new Map<string, SetFact & { sets: number }>();
+  for (const s of sets) {
+    const key = s.exercise.trim().toLowerCase();
+    const cur = latest.get(key);
+    // Most recent day; on the same day, the heaviest work set.
+    if (!cur || s.occurredOn > cur.occurredOn || (s.occurredOn === cur.occurredOn && s.weightGrams > cur.weightGrams)) latest.set(key, s);
+  }
+  return [...latest.values()]
+    .map((s): LiftSuggestion => {
+      const last = { weightGrams: s.weightGrams, reps: s.reps, sets: s.sets, occurredOn: s.occurredOn };
+      if (s.weightGrams === 0) return { exercise: s.exercise.trim(), last, next: { weightGrams: 0, reps: s.reps + 1, sets: s.sets }, reason: "bodyweight" };
+      if (s.reps >= REP_RANGE.high) {
+        return { exercise: s.exercise.trim(), last, next: { weightGrams: s.weightGrams + WEIGHT_STEP_GRAMS, reps: REP_RANGE.low, sets: s.sets }, reason: "add-weight" };
+      }
+      return { exercise: s.exercise.trim(), last, next: { weightGrams: s.weightGrams, reps: s.reps + 1, sets: s.sets }, reason: "add-rep" };
+    })
+    .sort((a, b) => b.last.occurredOn.localeCompare(a.last.occurredOn) || a.exercise.localeCompare(b.exercise));
+}

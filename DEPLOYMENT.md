@@ -7,7 +7,7 @@ There is no cloud deployment. "Production" = LIFEQUEST running on your Windows P
 ```powershell
 git switch main; git pull
 npm ci
-npm run build
+npm run app:build      # builds the real app into .next-prod (test builds use .next and never touch it)
 npm run app:start      # migrates the production DB (with pre-migrate backup), then serves http://127.0.0.1:3000
 ```
 

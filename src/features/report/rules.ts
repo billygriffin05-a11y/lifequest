@@ -3,7 +3,7 @@
  * Tests: tests/unit/report.test.ts
  */
 import { areaForCategory } from "@/features/dragons/areas";
-import { bossBattle, type BossBattle } from "@/features/honour/progress";
+import { bossBattle, type ActivityDamage, type BossBattle } from "@/features/honour/progress";
 
 export interface DeedFact {
   actionName: string;
@@ -58,7 +58,7 @@ function tally(rows: DeedFact[]): CountedAction[] {
 }
 
 /** Honour side of the report. Undone deeds and their reversals are ignored. */
-export function summariseWeek(deeds: readonly DeedFact[], weekStart: string): WeekHonour {
+export function summariseWeek(deeds: readonly DeedFact[], weekStart: string, activity?: ActivityDamage): WeekHonour {
   const days = new Set(weekDays(weekStart));
   const live = deeds.filter((d) => days.has(d.occurredOn) && !d.undone && !d.isReversal);
   const good = live.filter((d) => d.kind === "good");
@@ -91,6 +91,6 @@ export function summariseWeek(deeds: readonly DeedFact[], weekStart: string): We
     wins: tally(good).slice(0, 5),
     misses: tally(bad).slice(0, 5),
     dragons: [...xpByArea.values()].filter((d) => d.xp > 0).sort((a, b) => b.xp - a.xp),
-    boss: bossBattle(weekStart, goodHonour, badHonour),
+    boss: bossBattle(weekStart, goodHonour, badHonour, activity),
   };
 }

@@ -15,6 +15,7 @@
  * Deterministic: same (stage, mood, element) → same pixels.
  */
 import type { Element, PaletteRole } from "./areas";
+import { planFor, type BodyPlan, type EvolutionPath } from "./body-plans";
 import { UNLOCKS, type Mood } from "./rules";
 
 export const GRID_W = 56;
@@ -50,6 +51,10 @@ export interface SpriteLayers {
   mouth: Pt | null;
   /** Top-centre of the head (or egg) — where cosmetics sit. */
   head: Pt;
+  /** Late-stage dragons fly: the body hovers above a ground shadow. */
+  flying: boolean;
+  /** Ground shadow under a flying dragon (stays still while the dragon bobs). */
+  shadow: Run[];
 }
 
 // ── Raster helpers ───────────────────────────────────────────────────────────
@@ -90,6 +95,13 @@ function polygon(g: Grid, pts: readonly Pt[], role: PaletteRole) {
       if (inside) set(g, x, y, role);
     }
   }
+}
+
+/** Like polygon, but only fills empty cells: spikes that stick OUT of the silhouette. */
+function protrude(g: Grid, pts: readonly Pt[], role: PaletteRole) {
+  const mask = makeGrid();
+  polygon(mask, pts, role);
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) if (mask[y][x] && g[y][x] === null) g[y][x] = role;
 }
 
 function line(g: Grid, [x0, y0]: Pt, [x1, y1]: Pt, role: PaletteRole) {
@@ -188,10 +200,12 @@ const scaleFor = (stage: number) => 0.5 + ((Math.min(19, stage) - 3) / 16) * 0.5
 interface Frame {
   k: number;
   dx: number;
+  /** Pixels lifted off the ground (flying). */
+  hover: number;
 }
 
 /** Scale around the ground centre, then shift right by dx. */
-const sc = (f: Frame, x: number, y: number): Pt => [20 + (x - 20) * f.k + f.dx, GROUND - (GROUND - y) * f.k];
+const sc = (f: Frame, x: number, y: number): Pt => [20 + (x - 20) * f.k + f.dx, GROUND - (GROUND - y) * f.k - f.hover];
 
 /** Draws the eye; returns the eye pixels so the blink layer can cover them. */
 function drawEye(g: Grid, ex: number, ey: number, mood: Mood, fierce: boolean): Pt[] {
@@ -231,84 +245,337 @@ function drawEye(g: Grid, ex: number, ey: number, mood: Mood, fierce: boolean): 
 }
 
 interface DragonResult {
+  flying: boolean;
   wingOrigin: Pt | null;
   mouth: Pt;
   eyes: Pt[];
   head: Pt;
 }
 
-function drawWing(w: Grid, f: Frame, stage: number): Pt {
-  const span = 0.55 + ((stage - UNLOCKS.wings) / (19 - UNLOCKS.wings)) * 0.9;
-  const [ax, ay] = sc(f, 18, 22);
+function clear(g: Grid, x: number, y: number) {
+  const xi = Math.round(x);
+  const yi = Math.round(y);
+  if (xi >= 0 && yi >= 0 && xi < GRID_W && yi < GRID_H) g[yi][xi] = null;
+}
+
+/** Wings differ per element: bat, stubby, jagged, fin, feather, tattered or sharp. */
+function drawWing(w: Grid, f: Frame, stage: number, plan: BodyPlan, [ax, ay]: Pt): Pt {
+  const span = (0.55 + ((stage - UNLOCKS.wings) / (19 - UNLOCKS.wings)) * 0.9) * plan.wingSpan * (f.hover ? 1.2 : 1);
   const tipH = 13 * f.k * span;
   const tipW = 11 * f.k * span;
   const back: Pt = [ax - tipW * 0.8, ay - tipH * 0.8];
   const top: Pt = [ax - tipW * 0.12, ay - tipH * 1.1];
   const front: Pt = [ax + tipW * 0.55, ay - tipH * 0.72];
   const anchor: Pt = [ax, ay];
+  const R = (p: Pt): Pt => [Math.round(p[0]), Math.round(p[1])];
   const scallop = (a: Pt, b: Pt): Pt => [lerp((a[0] + b[0]) / 2, anchor[0], 0.28), lerp((a[1] + b[1]) / 2, anchor[1], 0.28)];
-  polygon(
-    w,
-    [
-      [ax + 3 * f.k, ay + 1],
-      front,
-      scallop(front, top),
-      top,
-      scallop(top, back),
-      back,
-      [ax - tipW * 0.4, ay - tipH * 0.2],
-      [ax - 1, ay + 1],
-    ],
-    "wing",
-  );
-  // Finger bones + arm, claw at the wrist
-  for (const tip of [back, top, front]) line(w, [Math.round(ax), Math.round(ay)], [Math.round(tip[0]), Math.round(tip[1])], "wingShade");
-  line(w, [Math.round(ax) + 1, Math.round(ay)], [Math.round(top[0]) + 1, Math.round(top[1])], "wingShade");
-  set(w, top[0], top[1] - 1, "horn");
+  const bones = (tips: Pt[]) => {
+    for (const tip of tips) line(w, R(anchor), R(tip), "wingShade");
+  };
+
+  switch (plan.wing) {
+    case "jagged": {
+      // Saw-tooth trailing edge like forked lightning.
+      const pts: Pt[] = [[ax + 3 * f.k, ay + 1], front];
+      const edge = [front, top, back];
+      for (let i = 0; i < edge.length - 1; i++) {
+        const [a, b] = [edge[i], edge[i + 1]];
+        for (const t of [0.33, 0.66]) {
+          const p: Pt = [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+          const pull = t === 0.33 ? 0.35 : 0.05;
+          pts.push([lerp(p[0], anchor[0], pull), lerp(p[1], anchor[1], pull)]);
+        }
+        pts.push(b);
+      }
+      pts.push([ax - tipW * 0.4, ay - tipH * 0.2], [ax - 1, ay + 1]);
+      polygon(w, pts, "wing");
+      bones([back, top, front]);
+      set(w, top[0], top[1] - 1, "accent");
+      break;
+    }
+    case "fin": {
+      // Rounded fan fin with ribs, like a fish fin.
+      const arc: Pt[] = [];
+      for (let i = 0; i <= 10; i++) {
+        const a = Math.PI * (1.05 + i * 0.075);
+        arc.push([ax + Math.cos(a) * tipW * 0.95, ay + Math.sin(a) * tipH * 0.95]);
+      }
+      polygon(w, [[ax + 2 * f.k, ay + 1], ...arc.reverse(), [ax - 1, ay + 1]], "wing");
+      for (let i = 1; i < 10; i += 2) {
+        const a = Math.PI * (1.05 + i * 0.075);
+        line(w, R(anchor), R([ax + Math.cos(a) * tipW * 0.85, ay + Math.sin(a) * tipH * 0.85]), "wingShade");
+      }
+      break;
+    }
+    case "feather": {
+      // Layered long feathers fanning out.
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI * (1.08 + i * 0.105);
+        const len = (0.75 + (i % 2) * 0.2) * Math.max(tipW, tipH) * 1.05;
+        const mid: Pt = [ax + Math.cos(a) * len * 0.55, ay + Math.sin(a) * len * 0.55];
+        const rot = (px: number, py: number): Pt => [mid[0] + Math.cos(a) * px - Math.sin(a) * py, mid[1] + Math.sin(a) * px + Math.cos(a) * py];
+        const hl = Math.max(1.4, len * 0.5);
+        const hw = Math.max(1, 1.6 * f.k);
+        polygon(w, [rot(-hl, 0), rot(-hl * 0.3, -hw), rot(hl, 0), rot(-hl * 0.3, hw)], i % 2 ? "wing" : "wingShade");
+      }
+      line(w, R(anchor), R(top), "wingShade");
+      break;
+    }
+    case "sharp": {
+      // One angular blade-like wing with two struts.
+      const peak: Pt = [ax - tipW * 0.2, ay - tipH * 1.15];
+      const rear: Pt = [ax - tipW, ay - tipH * 0.45];
+      polygon(w, [[ax + 2 * f.k, ay + 1], [ax + tipW * 0.35, ay - tipH * 0.9], peak, rear, [ax - 1, ay + 1]], "wing");
+      bones([peak, rear]);
+      set(w, peak[0], peak[1] - 1, "accent");
+      break;
+    }
+    default: {
+      // bat / stubby / tattered share the classic scalloped bat wing.
+      polygon(w, [[ax + 3 * f.k, ay + 1], front, scallop(front, top), top, scallop(top, back), back, [ax - tipW * 0.4, ay - tipH * 0.2], [ax - 1, ay + 1]], "wing");
+      bones([back, top, front]);
+      line(w, [Math.round(ax) + 1, Math.round(ay)], [Math.round(top[0]) + 1, Math.round(top[1])], "wingShade");
+      set(w, top[0], top[1] - 1, "horn");
+      if (plan.wing === "tattered") {
+        // Torn holes and ragged edges.
+        for (let y = 0; y < GRID_H; y++) {
+          for (let x = 0; x < GRID_W; x++) {
+            if (w[y][x] !== "wing") continue;
+            const edge = !get(w, x, y - 1) || !get(w, x - 1, y);
+            if (noise(x, y, 7) < (edge ? 0.35 : 0.12)) clear(w, x, y);
+          }
+        }
+      }
+    }
+  }
   addOutline(w);
   return [ax, ay];
 }
 
-function drawDragon(g: Grid, w: Grid, stage: number, mood: Mood): DragonResult {
-  const f: Frame = { k: scaleFor(stage), dx: stage >= UNLOCKS.breath ? 3 : 8 };
-  const { k } = f;
-  const fierce = stage >= UNLOCKS.fangs;
-  const headR = 5.4 * k * (1 + (1 - k) * 0.8);
-
-  const [bx, by] = sc(f, 19, 27);
-  const brx = 9 * k;
-  const bry = 6.5 * k;
-  const [hx, hy] = sc(f, 29, 16.5);
-
-  const wingOrigin = stage >= UNLOCKS.wings ? drawWing(w, f, stage) : null;
-
-  // Tail: tapering, curling up and back
-  const tailLen = 4 + (stage - 3) * 0.7;
-  const [tx0, ty0] = [bx - brx * 0.85, by + bry * 0.25];
+/** Tail body and tip, per style. */
+function drawTail(g: Grid, plan: BodyPlan, stage: number, k: number, [tx0, ty0]: Pt, bry: number): void {
+  const tailLen = (4 + (stage - 3) * 0.7) * plan.tailLen;
   let tip: Pt = [tx0, ty0];
-  for (let i = 0; i <= 16; i++) {
-    const t = i / 16;
-    const x = tx0 - tailLen * t * 0.85;
-    const y = ty0 - Math.sin(t * Math.PI * 0.85) * tailLen * 0.45 + t * 1.5;
-    const r = Math.max(0.9, bry * 0.42 * (1 - t * 0.8));
+  let prev: Pt = [tx0, ty0];
+  const thin = plan.tail === "barb" || plan.tail === "orb";
+  for (let i = 0; i <= 18; i++) {
+    const t = i / 18;
+    let x = tx0 - tailLen * t * 0.85;
+    let y: number;
+    if (plan.tail === "zigzag") {
+      const seg = t * 4;
+      const zig = (Math.floor(seg) % 2 === 0 ? seg % 1 : 1 - (seg % 1)) - 0.5;
+      y = ty0 - t * tailLen * 0.35 + zig * 3 * Math.max(0.8, k);
+    } else if (plan.tail === "wave") {
+      x = tx0 - tailLen * t * 0.95;
+      y = ty0 + Math.sin(t * Math.PI * 2.2) * 2.4 * Math.max(0.7, k) + t * 1.2;
+    } else if (plan.tail === "barb") {
+      y = ty0 - Math.sin(t * Math.PI * 0.6) * tailLen * 0.25 + t * 2.5;
+    } else {
+      y = ty0 - Math.sin(t * Math.PI * 0.85) * tailLen * 0.45 + t * 1.5;
+    }
+    const r = Math.max(thin ? 0.6 : 0.9, bry * 0.42 * (1 - Math.min(1, t * (thin ? 0.95 : 0.8))));
     ellipse(g, x, y, r, r, "body");
+    prev = tip;
     tip = [x, y];
   }
-  if (stage >= UNLOCKS.tailBlade) {
-    polygon(g, [[tip[0] + 0.5, tip[1]], [tip[0] - 3, tip[1] - 2.6], [tip[0] - 2.4, tip[1] + 1.8]], "accent");
+  if (stage < UNLOCKS.tailBlade) return;
+  const [x, y] = tip;
+  const dir = Math.atan2(tip[1] - prev[1], tip[0] - prev[0]);
+  const ahead = (d: number, side = 0): Pt => [x + Math.cos(dir) * d - Math.sin(dir) * side, y + Math.sin(dir) * d + Math.cos(dir) * side];
+  switch (plan.tail) {
+    case "club":
+      ellipse(g, x - 0.5, y, 2.2 * Math.max(1, k * 1.4), 1.9 * Math.max(1, k * 1.3), "horn");
+      set(g, x - 2, y - 2, "accent");
+      set(g, x + 1, y - 2, "accent");
+      break;
+    case "zigzag":
+      polygon(g, [ahead(-0.5, -1.4), ahead(3.2), ahead(-0.5, 1.4)], "accent");
+      break;
+    case "wave":
+      // Vertical fluke like a fish tail.
+      polygon(g, [[x + 0.5, y], [x - 2.5, y - 3.6], [x - 1.2, y], [x - 2.5, y + 3.6]], "wing");
+      break;
+    case "orb":
+      ellipse(g, x - 1, y, 1.9, 1.9, "glow");
+      set(g, x - 1.5, y - 0.8, "eyeShine");
+      break;
+    case "fan":
+      for (const s of [-1, 0, 1]) {
+        const a = dir + s * 0.55;
+        ellipse(g, x + Math.cos(a) * 2.4, y + Math.sin(a) * 2.4, 1.9, 1, s === 0 ? "wingShade" : "wing");
+      }
+      break;
+    case "barb":
+      polygon(g, [ahead(-1, -1.8), ahead(2.6), ahead(-1, 1.8), ahead(0.2)], "horn");
+      break;
+    case "blade":
+      polygon(g, [[x + 0.5, y], [x - 4, y - 3.6], [x - 2.2, y - 0.2], [x - 3.4, y + 2.6]], "accent");
+      set(g, x - 2.5, y - 1.5, "eyeShine");
+      break;
+    default:
+      polygon(g, [[x + 0.5, y], [x - 3, y - 2.6], [x - 2.4, y + 1.8]], "accent");
   }
+}
 
-  // Legs with claws
-  const legW = Math.max(2, Math.round(2.8 * k));
+/** Decorations along the top of the back. */
+function drawBack(g: Grid, plan: BodyPlan, stage: number, bx: number, by: number, brx: number, bry: number) {
+  if (stage < UNLOCKS.spines || plan.back === "none") return;
+  const topAt = (sx: number) => by - bry * Math.sqrt(Math.max(0, 1 - ((sx - bx) / brx) ** 2)) + 0.5;
+  const grow = (stage - UNLOCKS.spines) * 0.15 * (stage >= UNLOCKS.regal ? 1.7 : 1) * (plan.armour ?? 1);
+  const count = Math.min(7, 3 + Math.floor((stage - UNLOCKS.spines) / 2));
+  const at = (i: number, n = count) => bx - brx * 0.75 + ((i + 0.5) / n) * brx * 1.35;
+  switch (plan.back) {
+    case "plates":
+      for (let i = 0; i < count; i++) {
+        const sx = at(i);
+        ellipse(g, sx, topAt(sx) - 0.4, 1.5 + grow * 0.5, 1.2 + grow * 0.6, i % 2 ? "horn" : "accent");
+      }
+      break;
+    case "fins":
+      for (let i = 0; i < count; i++) {
+        const sx = at(i);
+        const sy = topAt(sx);
+        polygon(g, [[sx - 1.4, sy + 0.5], [sx + 1, sy + 0.5], [sx - 1.8, sy - 2.2 - grow]], "wing");
+      }
+      break;
+    case "shards":
+      for (let i = 0; i < count + 1; i++) {
+        const sx = at(i, count + 1);
+        const sy = topAt(sx);
+        const h = 1.8 + grow * 1.6 + (i % 2 ? 1.4 : 0);
+        polygon(g, [[sx - 0.9, sy], [sx + 0.9, sy], [sx + 0.2, sy - h]], "accent");
+        set(g, sx, sy - h * 0.5, "eyeShine");
+      }
+      break;
+    case "ridges":
+      for (let i = 0; i < count * 2; i++) {
+        const sx = at(i, count * 2);
+        set(g, sx, topAt(sx) - 1, "horn");
+        if (i % 2 === 0) set(g, sx, topAt(sx) - 2, "horn");
+      }
+      break;
+    case "sail": {
+      const crest: Pt[] = [];
+      for (let i = 0; i <= 8; i++) {
+        const sx = bx - brx * 0.7 + (i / 8) * brx * 1.3;
+        crest.push([sx, topAt(sx) - (2 + grow * 2) * Math.sin((i / 8) * Math.PI)]);
+      }
+      const base = crest.map(([sx]): Pt => [sx, topAt(sx) + 0.6]).reverse();
+      polygon(g, [...crest, ...base], "wing");
+      for (let i = 1; i < 8; i += 2) {
+        line(g, [Math.round(crest[i][0]), Math.round(topAt(crest[i][0]))], [Math.round(crest[i][0]), Math.round(crest[i][1])], "glow");
+      }
+      break;
+    }
+    default: {
+      const h = 1.4 + grow;
+      for (let i = 0; i < count; i++) {
+        const sx = at(i);
+        const sy = topAt(sx);
+        polygon(g, [[sx - 1.1, sy], [sx + 1.1, sy], [sx - 0.5, sy - h]], "horn");
+      }
+    }
+  }
+}
+
+function drawHorns(g: Grid, plan: BodyPlan, stage: number, k: number, hx: number, hy: number, headR: number) {
+  if (stage < UNLOCKS.horns) return;
+  const L = (2 + (stage - UNLOCKS.horns) * 0.45) * (stage >= UNLOCKS.regal ? 1.3 : 1);
+  const twin = stage >= UNLOCKS.twinHorns;
+  const w0 = 1.25 * Math.min(1.4, 0.7 + k * 0.6);
+  const bases = (twin ? [-0.15, -0.55] : [-0.25]).map((off): Pt => [hx + headR * off, hy - headR * 0.72]);
+  for (const base of bases) {
+    switch (plan.horns) {
+      case "long":
+        bezierStroke(g, base, [base[0] - L * 0.6, base[1] - L * 0.55], [base[0] - L * 1.5, base[1] - L * 0.8], w0 * 0.9, 0.45, "horn");
+        break;
+      case "nubs":
+        ellipse(g, base[0], base[1] - 0.6, 1 + L * 0.12, 0.9 + L * 0.12, "horn");
+        break;
+      case "forward":
+        bezierStroke(g, base, [base[0] - L * 0.2, base[1] - L * 1.1], [base[0] + L * 0.75, base[1] - L * 0.9], w0, 0.5, "horn");
+        break;
+      case "antlers": {
+        const tip: Pt = [base[0] - L * 0.5, base[1] - L * 1.2];
+        bezierStroke(g, base, [base[0] - L * 0.1, base[1] - L * 0.7], tip, w0 * 0.8, 0.5, "horn");
+        const mid: Pt = [lerp(base[0], tip[0], 0.55), lerp(base[1], tip[1], 0.55)];
+        line(g, [Math.round(mid[0]), Math.round(mid[1])], [Math.round(mid[0] + L * 0.45), Math.round(mid[1] - L * 0.35)], "horn");
+        if (L > 4) line(g, [Math.round(mid[0]), Math.round(mid[1])], [Math.round(mid[0] - L * 0.45), Math.round(mid[1] - L * 0.15)], "horn");
+        set(g, tip[0], tip[1] - 1, "glow");
+        break;
+      }
+      case "crystal":
+        polygon(g, [[base[0] - 1, base[1] + 0.5], [base[0] + 1, base[1] + 0.5], [base[0] - 0.3, base[1] - L * 1.1]], "accent");
+        set(g, base[0] - 0.2, base[1] - L * 0.5, "eyeShine");
+        break;
+      default:
+        bezierStroke(g, base, [base[0] - L * 0.35, base[1] - L * 0.9], [base[0] - L * 1.05, base[1] - L * 0.55], w0, 0.5, "horn");
+    }
+  }
+  if (plan.horns === "crystal" && twin) {
+    const c: Pt = [hx - headR * 0.35, hy - headR * 0.85];
+    polygon(g, [[c[0] - 0.7, c[1] + 0.5], [c[0] + 0.7, c[1] + 0.5], [c[0], c[1] - L * 0.7]], "accent");
+  }
+}
+
+/** Regal spikes: a row down the back of the neck and swept-back cheek spikes. */
+function drawRegal(g: Grid, plan: BodyPlan, stage: number, hx: number, hy: number, headR: number, bx: number, by: number, brx: number, bry: number) {
+  if (stage < UNLOCKS.regal) return;
+  const size = 2.6 + (stage - UNLOCKS.regal) * 0.45;
+  // Spiked frill radiating from the back of the head, like a war crest.
+  const role: PaletteRole = plan.back === "fins" || plan.back === "sail" ? "wing" : plan.back === "shards" || plan.back === "plates" ? "accent" : "horn";
+  for (const deg of [118, 140, 162, 184]) {
+    const a = (deg * Math.PI) / 180;
+    const ux = Math.cos(a);
+    const uy = -Math.sin(a);
+    const base: Pt = [hx + ux * headR * 0.92, hy + uy * headR * 0.92];
+    const len = size * (deg === 140 || deg === 162 ? 1.25 : 0.95);
+    protrude(g, [[base[0] - uy * 1.1, base[1] + ux * 1.1], [base[0] + ux * len, base[1] + uy * len], [base[0] + uy * 1.1, base[1] - ux * 1.1]], role);
+  }
+  // Shoulder spikes jutting up from the back
+  for (const dx of [0.1, 0.45]) {
+    const s: Pt = [bx + brx * dx, by - bry * 0.95];
+    protrude(g, [[s[0] - 1.2, s[1] + 1], [s[0] + 1.2, s[1] + 1], [s[0] - size * 0.4, s[1] - size * 1.1]], "horn");
+  }
+}
+
+function drawDragon(g: Grid, w: Grid, sh: Grid, stage: number, mood: Mood, plan: BodyPlan): DragonResult {
+  const flying = stage >= UNLOCKS.flight;
+  const f: Frame = { k: scaleFor(stage) * (flying ? 0.9 : 1), dx: stage >= UNLOCKS.breath ? 3 : 8, hover: flying ? 6 : 0 };
+  const { k } = f;
+  const fierce = stage >= UNLOCKS.fangs;
+  const headR = 5.4 * k * (1 + (1 - k) * 0.8) * plan.head;
+
+  const [bx, by] = sc(f, 19, 27 + plan.lift);
+  const brx = 9 * k * plan.bodyW;
+  const bry = 6.5 * k * plan.bodyH;
+  const [hx, hy] = sc(f, 29 + plan.neckX, 16.5 + plan.neckY + plan.lift * 0.6);
+
+  const wingOrigin = stage >= UNLOCKS.wings ? drawWing(w, f, stage, plan, [bx - 1 * k, by - bry * 0.77]) : null;
+
+  drawTail(g, plan, stage, k, [bx - brx * 0.85, by + bry * 0.25], bry);
+
+  // Legs with claws (length follows the body's lift). Flying dragons tuck them in.
+  const legW = Math.max(2, Math.round(2.8 * k * plan.legW));
   for (const lx of [bx - brx * 0.45, bx + brx * 0.45]) {
     const x0 = Math.round(lx - legW / 2);
-    for (let y = Math.round(by + bry * 0.4); y <= GROUND - 1; y++) for (let x = x0; x < x0 + legW; x++) set(g, x, y, "shade");
-    set(g, x0 + legW, GROUND - 1, "horn");
+    if (flying) {
+      const top = Math.round(by + bry * 0.4);
+      for (let i = 0; i < 4; i++) for (let x = 0; x < legW; x++) set(g, x0 + x - Math.floor(i * 0.7), top + i, "shade");
+      set(g, x0 - 3, top + 4, "horn");
+      set(g, x0 - 2, top + 4, "horn");
+    } else {
+      for (let y = Math.round(by + bry * 0.4); y <= GROUND - 1; y++) for (let x = x0; x < x0 + legW; x++) set(g, x, y, "shade");
+      set(g, x0 + legW, GROUND - 1, "horn");
+      if (plan.legW > 1.3) set(g, x0 - 1, GROUND - 1, "horn");
+    }
   }
+  if (flying) ellipse(sh, bx + 2, GROUND - 0.5, brx * 1.15, 1.2, "shade");
 
   // Body, neck, head, snout
   ellipse(g, bx, by, brx, bry, "body");
-  ellipse(g, (bx + hx) / 2 + 1, (by + hy) / 2 + 1, headR * 0.62, (by - hy) / 2 + 1, "body");
+  ellipse(g, (bx + hx) / 2 + 1, (by + hy) / 2 + 1, headR * 0.62, Math.max(headR * 0.5, (by - hy) / 2 + 1), "body");
   ellipse(g, hx, hy, headR, headR * 0.92, "body");
   const snoutX = hx + headR * 0.85;
   const snoutY = hy + headR * 0.35;
@@ -321,7 +588,7 @@ function drawDragon(g: Grid, w: Grid, stage: number, mood: Mood): DragonResult {
   }
   const isFlesh = (x: number, y: number) => get(g, x, y) === "body" || get(g, x, y) === "shade";
   ellipse(g, bx + brx * 0.25, by + bry * 0.3, brx * 0.55, bry * 0.55, "belly", isFlesh);
-  ellipse(g, (bx + hx) / 2 + 2.2, (by + hy) / 2 + 2, headR * 0.3, (by - hy) / 2, "belly", (x, y) => get(g, x, y) === "body");
+  ellipse(g, (bx + hx) / 2 + 2.2, (by + hy) / 2 + 2, headR * 0.3, Math.max(1, (by - hy) / 2), "belly", (x, y) => get(g, x, y) === "body");
   if (stage >= UNLOCKS.plates) {
     for (let y = Math.round(by - bry * 0.1); y < by + bry * 0.8; y += 2) {
       for (let x = 0; x < GRID_W; x++) if (g[y]?.[x] === "belly") g[y][x] = "bellyShade";
@@ -337,36 +604,20 @@ function drawDragon(g: Grid, w: Grid, stage: number, mood: Mood): DragonResult {
     set(g, snoutX - headR * 0.05, snoutY + headR * 0.55, "eyeShine");
   }
 
-  // Curved horns (medieval, swept back)
-  if (stage >= UNLOCKS.horns) {
-    const L = 2 + (stage - UNLOCKS.horns) * 0.45;
-    const horns = stage >= UNLOCKS.twinHorns ? [-0.15, -0.55] : [-0.25];
-    for (const off of horns) {
-      const base: Pt = [hx + headR * off, hy - headR * 0.72];
-      bezierStroke(g, base, [base[0] - L * 0.35, base[1] - L * 0.9], [base[0] - L * 1.05, base[1] - L * 0.55], 1.25 * Math.min(1.4, 0.7 + k * 0.6), 0.5, "horn");
-    }
-  }
+  drawHorns(g, plan, stage, k, hx, hy, headR);
 
-  // Crest frill behind the head
+  // Crest frill behind the head (water dragons get wider, fin-coloured frills)
   if (stage >= UNLOCKS.crest) {
-    for (let i = 0; i < 3; i++) {
+    const finny = plan.back === "fins";
+    for (let i = 0; i < (finny ? 4 : 3); i++) {
       const cx = hx - headR * (0.75 + i * 0.25);
       const cy = hy - headR * (0.1 - i * 0.25);
-      polygon(g, [[cx, cy - 1], [cx + 1.4, cy + 1], [cx - 2.4, cy + 0.4]], "accent");
+      polygon(g, [[cx, cy - 1], [cx + 1.4, cy + 1], [cx - 2.4, cy + 0.4]], finny ? "wing" : "accent");
     }
   }
 
-  // Back spines
-  if (stage >= UNLOCKS.spines) {
-    const count = Math.min(7, 3 + Math.floor((stage - UNLOCKS.spines) / 2));
-    const h = 1.4 + (stage - UNLOCKS.spines) * 0.15;
-    for (let i = 0; i < count; i++) {
-      const t = (i + 0.5) / count;
-      const sx = bx - brx * 0.75 + t * brx * 1.35;
-      const sy = by - bry * Math.sqrt(Math.max(0, 1 - ((sx - bx) / brx) ** 2)) + 0.5;
-      polygon(g, [[sx - 1.1, sy], [sx + 1.1, sy], [sx - 0.5, sy - h]], "horn");
-    }
-  }
+  drawBack(g, plan, stage, bx, by, brx, bry);
+  drawRegal(g, plan, stage, hx, hy, headR, bx, by, brx, bry);
 
   const eyes = drawEye(g, hx + headR * 0.2, hy - headR * 0.25, mood, fierce);
 
@@ -383,16 +634,9 @@ function drawDragon(g: Grid, w: Grid, stage: number, mood: Mood): DragonResult {
       if (g[y][x] === null) for (const [ox, oy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) set(g, x + ox, y + oy, "aura");
     }
   }
-  if (stage >= UNLOCKS.crown) {
-    const top = Math.round(hy - headR - 1);
-    for (let x = Math.round(hx - 2); x <= Math.round(hx + 2); x++) set(g, x, top, "aura");
-    for (const dx of [-2, 0, 2]) {
-      set(g, hx + dx, top - 1, "aura");
-      if (dx === 0) set(g, hx, top - 2, "aura");
-    }
-  }
 
   return {
+    flying,
     wingOrigin,
     mouth: [Math.round(snoutX + headR * 0.6), Math.round(snoutY + headR * 0.05)],
     eyes,
@@ -538,10 +782,12 @@ function motes(element: Element, stage: number): Particle[] {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-function build(stage: number, mood: Mood, element: Element): SpriteLayers {
+function build(stage: number, mood: Mood, element: Element, path: EvolutionPath | null): SpriteLayers {
   const g = makeGrid();
   const w = makeGrid();
   const b = makeGrid();
+  const sh = makeGrid();
+  let flying = false;
   let eyes: Pt[] = [];
   let wingOrigin: Pt | null = null;
   let mouth: Pt | null = null;
@@ -562,7 +808,8 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
     drawEgg(g, "hatching");
     addOutline(g);
   } else {
-    const r = drawDragon(g, w, stage, mood);
+    const r = drawDragon(g, w, sh, stage, mood, planFor(element, stage, path));
+    flying = r.flying;
     eyes = r.eyes;
     head = r.head;
     wingOrigin = r.wingOrigin;
@@ -576,18 +823,18 @@ function build(stage: number, mood: Mood, element: Element): SpriteLayers {
     .filter(([x, y]) => x >= 0 && y >= 0 && x < GRID_W && y < GRID_H)
     .map(([x, y]) => ({ x, y, w: 1, role: "body" as const }));
 
-  return { wing: toRuns(w), body: toRuns(g), lids, breath: toRuns(b), motes: motes(element, stage), wingOrigin, mouth, head };
+  return { wing: toRuns(w), body: toRuns(g), lids, breath: toRuns(b), motes: motes(element, stage), wingOrigin, mouth, head, flying, shadow: toRuns(sh) };
 }
 
 const cache = new Map<string, SpriteLayers>();
 
 /** All animation layers for a dragon. Cached; safe to call often. */
-export function spriteLayers(stage: number, mood: Mood, element: Element): SpriteLayers {
+export function spriteLayers(stage: number, mood: Mood, element: Element, path: EvolutionPath | null = null): SpriteLayers {
   const s = Math.min(19, Math.max(0, Math.floor(stage)));
-  const key = `${s}:${mood}:${element}`;
+  const key = `${s}:${mood}:${element}:${path ?? "-"}`;
   let layers = cache.get(key);
   if (!layers) {
-    layers = build(s, mood, element);
+    layers = build(s, mood, element, path);
     cache.set(key, layers);
   }
   return layers;

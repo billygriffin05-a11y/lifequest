@@ -13,6 +13,8 @@ interface Initial {
   icon: string;
   category: string;
   weeklyTarget?: number | null;
+  cue?: string | null;
+  cueTime?: string | null;
 }
 
 const EMPTY: Initial = { name: "", kind: "good", points: 10, icon: "⭐", category: "Habits", weeklyTarget: null };
@@ -142,6 +144,33 @@ export function ActionForm({ initial = EMPTY, mode = "create" }: { initial?: Ini
         <p className="mt-1 text-xs text-silver-300">Good actions only. +15 XP for every week you hit it.</p>
         {errorText("weeklyTarget")}
       </div>
+
+      <fieldset className="rounded-lg border border-obsidian-600 p-3 sm:col-span-2">
+        <legend className="px-1 text-sm text-silver-300">If-then plan (optional)</legend>
+        <p className="text-xs text-silver-300">Linking a habit to a cue you already have makes it far more likely to stick.</p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-[1fr_9rem]">
+          <div>
+            <label htmlFor={`${uid}-cue`} className="text-sm text-silver-300">
+              When…
+            </label>
+            <input
+              {...field("cue")}
+              className={input}
+              maxLength={80}
+              placeholder="e.g. After my morning coffee"
+              defaultValue={v?.cue ?? initial.cue ?? ""}
+            />
+            {errorText("cue")}
+          </div>
+          <div>
+            <label htmlFor={`${uid}-cueTime`} className="text-sm text-silver-300">
+              Remind me at
+            </label>
+            <input {...field("cueTime")} type="time" className={input} defaultValue={v?.cueTime ?? initial.cueTime ?? ""} />
+            {errorText("cueTime")}
+          </div>
+        </div>
+      </fieldset>
 
       <div>
         <label htmlFor={`${uid}-category`} className="text-sm text-silver-300">

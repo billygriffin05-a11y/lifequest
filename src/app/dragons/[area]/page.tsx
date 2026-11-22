@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { setDragonPathAction } from "@/features/dragons/server/actions";
+import { PATH_STAGE, PATHS, PLANS } from "@/features/dragons/body-plans";
 import { DragonSprite } from "@/features/dragons/components/dragon-sprite";
 import { RenameForm } from "@/features/dragons/components/rename-form";
 import { MOOD_HINT, MOOD_TEXT, STAGE_COUNT } from "@/features/dragons/rules";
@@ -33,13 +35,16 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
           {dragon.area.elementName} dragon of {dragon.area.name}
           {dragon.customName && <span className="text-silver-500"> · born {dragon.area.dragonName}</span>}
         </p>
+        <p className="mt-1 text-sm text-silver-300" data-testid="dragon-look">
+          {PLANS[dragon.area.element].look}
+        </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         <section
           aria-label="Dragon"
           className="rounded-2xl border border-obsidian-600 p-3"
-          style={{ background: `radial-gradient(ellipse at 45% 65%, ${dragon.area.palette.breathOuter}40, transparent 70%), #07080a` }}
+          style={{ background: `radial-gradient(ellipse at 45% 65%, ${dragon.area.palette.breathOuter}40, transparent 70%), var(--color-obsidian-950)` }}
         >
           <DragonSprite
             stage={growth.stage}
@@ -47,6 +52,7 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
             element={dragon.area.element}
             palette={dragon.area.palette}
             accessory={dragon.accessory}
+            path={dragon.path}
             label={`${dragon.displayName}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
             className="aspect-[7/5] w-full"
           />
@@ -73,6 +79,35 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
             Mood: <strong>{MOOD_TEXT[mood]}</strong>
           </p>
           <p className="text-sm text-silver-300">{MOOD_HINT[mood]}</p>
+          <section aria-labelledby="path-heading" className="mt-5 rounded-xl border border-obsidian-600 p-3" data-testid="evolution-path">
+            <h3 id="path-heading" className="font-display text-lg text-gold-300">
+              Evolution path
+            </h3>
+            {growth.stage < PATH_STAGE ? (
+              <p className="text-sm text-silver-300">At stage {PATH_STAGE + 1} you&apos;ll choose how {dragon.displayName} evolves.</p>
+            ) : (
+              <form action={setDragonPathAction} className="mt-2 grid gap-2 sm:grid-cols-2">
+                <input type="hidden" name="areaId" value={dragon.area.id} />
+                {(Object.keys(PATHS) as (keyof typeof PATHS)[]).map((p) => (
+                  <button
+                    key={p}
+                    type="submit"
+                    name="path"
+                    value={p}
+                    aria-pressed={dragon.path === p}
+                    className={`min-h-11 rounded-lg border px-3 py-2 text-left text-sm ${
+                      dragon.path === p ? "border-gold-400 bg-gold-500/15 text-gold-300" : "border-obsidian-600 text-silver-100 hover:border-emerald-400"
+                    }`}
+                  >
+                    <span className="block font-semibold">
+                      {PATHS[p].icon} {PATHS[p].name}
+                    </span>
+                    <span className="block text-xs text-silver-300">{PATHS[p].blurb}</span>
+                  </button>
+                ))}
+              </form>
+            )}
+          </section>
           <div className="mt-5">
             <RenameForm areaId={dragon.area.id} current={dragon.customName} defaultName={dragon.area.dragonName} />
           </div>
@@ -166,7 +201,7 @@ async function DragonDetail({ params }: { params: Promise<{ area: string }> }) {
 
 export default function DragonPage({ params }: PageProps<"/dragons/[area]">) {
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-[max(1rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-4">
       <nav aria-label="Breadcrumb" className="text-sm">
         <Link href="/dragons" className="inline-flex min-h-11 items-center text-silver-300 hover:text-gold-300">
           ← Dragon Lair

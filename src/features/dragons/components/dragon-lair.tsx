@@ -8,7 +8,7 @@ import { DragonSprite } from "./dragon-sprite";
 const num = new Intl.NumberFormat("en-GB");
 
 const moodStyle = {
-  joyful: { chip: "border-gold-500/50 text-gold-300", sprite: "lq-hop" },
+  joyful: { chip: "border-gold-500/50 text-gold-300", sprite: "" },
   content: { chip: "border-emerald-500/50 text-emerald-300", sprite: "" },
   restless: { chip: "border-silver-500/50 text-silver-300", sprite: "opacity-80" },
   grumpy: { chip: "border-ember-500/50 text-ember-300", sprite: "saturate-50 brightness-90" },
@@ -20,7 +20,7 @@ export async function DragonLair() {
 
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Your dragons">
-      {dragons.map(({ area, displayName, accessory, growth, mood, recentHonour }) => {
+      {dragons.map(({ area, displayName, accessory, path, growth, mood, recentHonour }) => {
         const style = moodStyle[mood];
         const headingId = `dragon-${area.id}`;
         return (
@@ -34,7 +34,7 @@ export async function DragonLair() {
                 className="aspect-[7/5] w-full overflow-hidden rounded-xl border border-obsidian-700 p-1"
                 style={{
                   // Elemental glow behind each dragon (art data, from its palette).
-                  background: `radial-gradient(ellipse at 45% 65%, ${area.palette.breathOuter}40, transparent 70%), #07080a`,
+                  background: `radial-gradient(ellipse at 45% 65%, ${area.palette.breathOuter}40, transparent 70%), var(--color-obsidian-950)`,
                 }}
               >
                 <DragonSprite
@@ -43,6 +43,7 @@ export async function DragonLair() {
                   element={area.element}
                   palette={area.palette}
                   accessory={accessory}
+                  path={path}
                   label={`${displayName}, the ${area.elementName} dragon of ${area.name}: ${growth.stageName}, ${MOOD_TEXT[mood].toLowerCase()}`}
                   className={`h-full w-full ${style.sprite}`}
                 />

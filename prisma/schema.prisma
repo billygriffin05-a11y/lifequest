@@ -89,6 +89,8 @@ model DragonProfile {
   customName String?
   /// Equipped cosmetic item id from the treasure shop (see src/features/treasury/catalog.ts).
   accessory  String?
+  /// Evolution path chosen from stage 10: "armoured" | "swift" (null = undecided).
+  path       String?
   updatedAt  DateTime @updatedAt
 }
 
@@ -118,6 +120,10 @@ model PointAction {
   sortOrder       Int          @default(0)
   /// Optional goal: times per week (Mon–Sun, Europe/London). Good actions only.
   weeklyTarget    Int?
+  /// If-then plan cue, e.g. "After my morning coffee" (implementation intention).
+  cue             String?
+  /// Optional reminder time for the plan, "HH:MM" Europe/London.
+  cueTime         String?
   archivedAt      DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -310,6 +316,10 @@ model Flashcard {
   back       String
   box        Int          @default(1)
   dueOn      String
+  /// FSRS memory state (null until first FSRS review). Days / 1–10.
+  stability  Float?
+  difficulty Float?
+  lastReviewOn String?
   /// Stable key for starter cards so re-seeding never duplicates.
   seedKey    String?      @unique
   archivedAt DateTime?
@@ -325,6 +335,8 @@ model CardReview {
   card      Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   day       String
   correct   Boolean
+  /// FSRS grade: 1 Again, 2 Hard, 3 Good, 4 Easy (null for older Leitner reviews).
+  grade     Int?
   createdAt DateTime  @default(now())
 
   @@index([day])
@@ -347,4 +359,43 @@ model FocusSession {
   createdAt DateTime @default(now())
 
   @@index([day])
+}
+
+// ── Push notifications (iPhone / PC home-screen app) ────────────────────────
+
+/// A browser push subscription. Endpoint is the push service URL (Apple/Google/Mozilla).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  failures  Int      @default(0)
+}
+
+/// One row per notification sent, so each reminder fires at most once per day.
+model PushLog {
+  key       String   @id
+  createdAt DateTime @default(now())
+}
+
+/// Sunday weekly review: three short reflections per week (keyed by the Monday).
+model WeeklyReview {
+  weekStart String   @id
+  win       String   @default("")
+  obstacle  String   @default("")
+  change    String   @default("")
+  updatedAt DateTime @updatedAt
+}
+
+/// A finished Security+ mock exam (self-marked). Per-topic results as JSON.
+model MockExam {
+  id          String   @id @default(cuid())
+  takenOn     String
+  durationSec Int
+  total       Int
+  correct     Int
+  /// [{ "topic": string, "total": number, "correct": number }]
+  byTopic     String
+  createdAt   DateTime @default(now())
 }

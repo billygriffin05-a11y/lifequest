@@ -2,6 +2,7 @@
  * Money service: budgets, spending, savings, CSV import. All values integer
  * pence; everything stays in the local database. Deletes are soft.
  */
+import { findRecurring, nextDue } from "../recurring";
 import { z } from "zod";
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { DEFAULT_CATEGORIES, guessCategory, rowsFromCsv } from "../csv-import";
@@ -223,4 +224,17 @@ export async function addDeposit(db: Db, goalId: string, amountPence: number, oc
 
 export async function archiveGoal(db: Db, id: string) {
   await db.savingsGoal.update({ where: { id }, data: { archivedAt: new Date() } });
+}
+
+// ── Bills & subscriptions (detected, never stored) ───────────────────────────
+
+/** Repeating payments found in the last 13 months of spending, with the next due date. */
+export async function getRecurring(db: Db, today: string) {
+  const since = new Date(`${today}T12:00:00Z`);
+  since.setUTCMonth(since.getUTCMonth() - 13);
+  const rows = await db.transaction.findMany({
+    where: { deletedAt: null, amountPence: { gt: 0 }, occurredOn: { gte: since.toISOString().slice(0, 10), lte: today } },
+    select: { occurredOn: true, amountPence: true, description: true },
+  });
+  return findRecurring(rows).map((r) => ({ ...r, nextOn: nextDue(r, today) }));
 }
